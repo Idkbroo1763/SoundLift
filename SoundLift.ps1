@@ -17,7 +17,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.3.25'
+$script:appVersion = '1.3.26'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -594,7 +594,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.3.25" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
+        Title="SoundLift V1.3.26" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -754,7 +754,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.3.25" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.3.26" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="#171719" CornerRadius="13" Padding="16,11" BorderBrush="#303035" BorderThickness="1">
         <StackPanel>
@@ -841,7 +841,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.3.25" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.3.26" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="#94A3B8" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="#94A3B8" FontSize="11" Margin="4,5,0,4"/>
@@ -1195,17 +1195,17 @@ function Apply-ProfileLayout {
 }
 
 function Show-ProfileOrderEditor {
-    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Profilok rendezése';$dialog.Width=500;$dialog.Height=560;$dialog.ResizeMode='NoResize';$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;$dialog.Background='#09090B';$dialog.Foreground='#F8FAFC'
+    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Profilok rendezése';$dialog.Width=500;$dialog.Height=590;$dialog.ResizeMode='NoResize';$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;$dialog.Background='#09090B';$dialog.Foreground='#F8FAFC'
     $root=[Windows.Controls.Grid]::new();$root.Margin=[Windows.Thickness]::new(24);$root.RowDefinitions.Add([Windows.Controls.RowDefinition]::new());$actions=[Windows.Controls.RowDefinition]::new();$actions.Height=[Windows.GridLength]::Auto;$root.RowDefinitions.Add($actions)
     $panel=[Windows.Controls.StackPanel]::new();$title=[Windows.Controls.TextBlock]::new();$title.Text='Profilok rendezése';$title.FontSize=23;$title.FontWeight='Bold';$title.Foreground=$window.Resources['AccentTextBrush'];[void]$panel.Children.Add($title)
     $hint=[Windows.Controls.TextBlock]::new();$hint.Text='A Zene mindig legfelül marad. A többi profilt fel-le mozgathatod vagy elrejtheted.';$hint.TextWrapping='Wrap';$hint.Foreground='#94A3B8';$hint.Margin=[Windows.Thickness]::new(0,5,0,14);[void]$panel.Children.Add($hint)
-    $list=[Windows.Controls.ListBox]::new();$list.Height=330;$list.Background='#111113';$list.Foreground='#F8FAFC';$list.BorderBrush='#29292E';$list.Padding=[Windows.Thickness]::new(6);[void]$panel.Children.Add($list)
+    $list=[Windows.Controls.ListBox]::new();$list.Height=250;$list.Background='#111113';$list.Foreground='#F8FAFC';$list.BorderBrush='#29292E';$list.Padding=[Windows.Thickness]::new(6);[void]$panel.Children.Add($list)
     $workingOrder=[Collections.ArrayList]@($script:profileOrder);$workingHidden=[Collections.ArrayList]@($script:hiddenProfiles)
     $refresh={ $selected=$list.SelectedIndex;$list.Items.Clear();foreach($id in $workingOrder){$suffix=if($id -in $workingHidden){'  (elrejtve)'}else{''};[void]$list.Items.Add("$(Get-ProfileDisplayName $id)$suffix")};if($selected -ge 0 -and $selected -lt $list.Items.Count){$list.SelectedIndex=$selected} }.GetNewClosure(); & $refresh
-    $tools=[Windows.Controls.StackPanel]::new();$tools.Orientation='Horizontal';$tools.Margin=[Windows.Thickness]::new(0,12,0,0)
-    $up=[Windows.Controls.Button]::new();$up.Content='↑ Fel';$up.Style=$window.Resources['UtilityButton'];$up.Width=90
-    $down=[Windows.Controls.Button]::new();$down.Content='↓ Le';$down.Style=$window.Resources['UtilityButton'];$down.Width=90
-    $toggle=[Windows.Controls.Button]::new();$toggle.Content='Elrejtés / mutatás';$toggle.Style=$window.Resources['UtilityButton'];$toggle.Width=160
+    $tools=[Windows.Controls.StackPanel]::new();$tools.Orientation='Horizontal';$tools.HorizontalAlignment='Center';$tools.Margin=[Windows.Thickness]::new(0,14,0,0)
+    $up=[Windows.Controls.Button]::new();$up.Content='↑  Fel';$up.Style=$window.Resources['UtilityButton'];$up.Width=90;$up.Height=40
+    $down=[Windows.Controls.Button]::new();$down.Content='↓  Le';$down.Style=$window.Resources['UtilityButton'];$down.Width=90;$down.Height=40
+    $toggle=[Windows.Controls.Button]::new();$toggle.Content='Elrejtés / mutatás';$toggle.Style=$window.Resources['UtilityButton'];$toggle.Width=170;$toggle.Height=40
     $up.Add_Click({$i=$list.SelectedIndex;if($i -gt 1){$item=$workingOrder[$i];$workingOrder.RemoveAt($i);$workingOrder.Insert($i-1,$item);$list.SelectedIndex=$i-1;&$refresh}}.GetNewClosure())
     $down.Add_Click({$i=$list.SelectedIndex;if($i -ge 1 -and $i -lt $workingOrder.Count-1){$item=$workingOrder[$i];$workingOrder.RemoveAt($i);$workingOrder.Insert($i+1,$item);$list.SelectedIndex=$i+1;&$refresh}}.GetNewClosure())
     $toggle.Add_Click({$i=$list.SelectedIndex;if($i -lt 1){return};$id=$workingOrder[$i];if($id -in $workingHidden){$workingHidden.Remove($id)}else{[void]$workingHidden.Add($id)};&$refresh}.GetNewClosure())
@@ -2023,6 +2023,10 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.3.26 – PROFILRENDEZŐ ABLAK JAVÍTÁSA
+• A Fel, Le és Elrejtés / mutatás gombok most teljes méretben, jól láthatóan elférnek az ablakban.
+• A profillista és az alsó műveleti gombok közötti térköz rendezettebb lett.
+
 V1.3.25 – RENDEZHETŐ PROFILOK ÉS ALKALMAZÁSHANGERŐ
 • A profilok sorrendje külön szerkesztőben módosítható, a nem használt profilok elrejthetők.
 • A Zene profil biztonságosan mindig a lista tetején marad.
@@ -2731,7 +2735,7 @@ $window.Add_SourceInitialized({
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.3.25'
+$script:trayIcon.Text = 'SoundLift V1.3.26'
 $script:trayIcon.Visible = $true
 $trayMenu = New-Object Windows.Forms.ContextMenuStrip
 $showItem = $trayMenu.Items.Add('Megnyitás')
