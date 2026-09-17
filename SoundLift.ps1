@@ -17,12 +17,13 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.3.23'
+$script:appVersion = '1.3.24'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
 $script:isQuickMuted = $false
 $script:preMuteVolume = 100
+$script:isBypassed = $false
 $script:onboardingCompleted = $false
 $script:discordApplicationId = '1547231878577393716'
 $script:discordPresencePipe = $null
@@ -212,6 +213,14 @@ public static class AudioAppNative {
         int OpenPropertyStore(uint access, out IPropertyStore properties);
     }
 
+    [ComImport, InterfaceType(ComInterfaceType.InterfaceIsIUnknown), Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064")]
+    interface IAudioMeterInformation {
+        int GetPeakValue(out float peak);
+        int GetMeteringChannelCount(out int channelCount);
+        int GetChannelsPeakValues(int channelCount, [Out, MarshalAs(UnmanagedType.LPArray, SizeParamIndex=0)] float[] peakValues);
+        int QueryHardwareSupport(out int hardwareSupportMask);
+    }
+
     [ComImport, InterfaceType(ComInterfaceType.InterfaceIsIUnknown), Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99")]
     interface IPropertyStore {
         int GetCount(out uint count);
@@ -238,6 +247,31 @@ public static class AudioAppNative {
         } catch { return "Ismeretlen"; }
         finally {
             if (store != null) Marshal.ReleaseComObject(store);
+            if (device != null) Marshal.ReleaseComObject(device);
+            if (enumerator != null) Marshal.ReleaseComObject(enumerator);
+        }
+    }
+
+    public static float[] GetDefaultOutputPeaks() {
+        IMMDeviceEnumerator enumerator = null; IMMDevice device = null; IAudioMeterInformation meter = null;
+        try {
+            enumerator = (IMMDeviceEnumerator)(new MMDeviceEnumeratorComObject());
+            if (enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out device) != 0) return new float[] { 0, 0 };
+            Guid iid = typeof(IAudioMeterInformation).GUID;
+            IntPtr instance;
+            if (device.Activate(ref iid, 23, IntPtr.Zero, out instance) != 0 || instance == IntPtr.Zero) return new float[] { 0, 0 };
+            meter = (IAudioMeterInformation)Marshal.GetObjectForIUnknown(instance);
+            Marshal.Release(instance);
+            int count;
+            if (meter.GetMeteringChannelCount(out count) != 0 || count < 1) return new float[] { 0, 0 };
+            float[] values = new float[count];
+            if (meter.GetChannelsPeakValues(count, values) != 0) return new float[] { 0, 0 };
+            float left = Math.Max(0, Math.Min(1, values[0]));
+            float right = Math.Max(0, Math.Min(1, values.Length > 1 ? values[1] : values[0]));
+            return new float[] { left, right };
+        } catch { return new float[] { 0, 0 }; }
+        finally {
+            if (meter != null) Marshal.ReleaseComObject(meter);
             if (device != null) Marshal.ReleaseComObject(device);
             if (enumerator != null) Marshal.ReleaseComObject(enumerator);
         }
@@ -558,7 +592,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.3.23" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
+        Title="SoundLift V1.3.24" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -718,7 +752,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.3.23" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.3.24" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="#171719" CornerRadius="13" Padding="16,11" BorderBrush="#303035" BorderThickness="1">
         <StackPanel>
@@ -804,7 +838,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.3.23" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.3.24" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="#94A3B8" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="#94A3B8" FontSize="11" Margin="4,5,0,4"/>
@@ -843,6 +877,31 @@ $xaml = @'
                 <TextBlock Name="FrequencyValue" Text="75 Hz" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Right"/>
               </DockPanel>
               <Slider Name="FrequencySlider" Grid.Row="1" Minimum="40" Maximum="160" Value="75" TickFrequency="5" IsSnapToTickEnabled="True"/>
+            </Grid>
+          </Border>
+
+          <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="18" Padding="22,15" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}" Margin="0,0,0,14">
+            <Grid>
+              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+              <DockPanel Margin="0,0,0,10">
+                <TextBlock Text="ÉLŐ HANGMÉRŐ" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                  <TextBlock Name="LiveBoostText" Text="Boost: 0.0 dB" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="0,0,14,0"/>
+                  <TextBlock Name="LiveClipText" Text="NINCS JEL" Foreground="#64748B" FontSize="11" FontWeight="Bold"/>
+                </StackPanel>
+              </DockPanel>
+              <Grid Grid.Row="1" Margin="0,0,0,7">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/><ColumnDefinition Width="48"/></Grid.ColumnDefinitions>
+                <TextBlock Text="L" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
+                <ProgressBar Name="LeftPeakMeter" Grid.Column="1" Height="9" Minimum="0" Maximum="100" Value="0" Foreground="{DynamicResource AccentTextBrush}" Background="{DynamicResource ControlBrush}" BorderThickness="0"/>
+                <TextBlock Name="LeftPeakText" Grid.Column="2" Text="0%" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11"/>
+              </Grid>
+              <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/><ColumnDefinition Width="48"/></Grid.ColumnDefinitions>
+                <TextBlock Text="R" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
+                <ProgressBar Name="RightPeakMeter" Grid.Column="1" Height="9" Minimum="0" Maximum="100" Value="0" Foreground="{DynamicResource AccentTextBrush}" Background="{DynamicResource ControlBrush}" BorderThickness="0"/>
+                <TextBlock Name="RightPeakText" Grid.Column="2" Text="0%" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11"/>
+              </Grid>
             </Grid>
           </Border>
 
@@ -957,7 +1016,7 @@ $appIconPath = Join-Path $script:appDirectory 'SoundLift.ico'
 if (Test-Path $appIconPath) {
     try { $window.Icon = [Windows.Media.Imaging.BitmapFrame]::Create([Uri]$appIconPath) } catch { }
 }
-$names = @('StatusBorder','StatusText','DeviceText','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','DiscordPresenceCheck','ClipText','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
+$names = @('StatusBorder','StatusText','DeviceText','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
 $VolumeSlider.ToolTip = 'A teljes hangerő erősítése 0 és 300% között.'
 $BassSlider.ToolTip = 'A mélyhangok kiemelése. Nagy értéknél használd a torzításvédelmet.'
@@ -1221,6 +1280,7 @@ $ApplyButton.Add_Click({
         $mainText = [Regex]::Replace($mainText, '(?im)^\s*Include:\s*SoundLift\.txt\s*\r?\n?', '')
         $mainText = $mainText.TrimEnd() + "`r`n`r`n# SoundLift`r`n$includeLine`r`n"
         Write-TextWithRetry $mainConfig $mainText
+        $script:isBypassed = $false
         $StatusText.Text = "Beállítások alkalmazva • $([int]$volumePercent)% hangerő • $([int]$bassDb) dB basszus"
         $StatusBorder.Background = '#143126'
     } catch {
@@ -1909,6 +1969,11 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.3.24 – TÁLCA-GYORSMENÜ ÉS ÉLŐ HANGMÉRŐ
+• A tálcaikon jobb klikkes menüjéből állítható a hangerő, a profil, a némítás és a SoundLift bypass.
+• A gyorsmenüből megnyitható a Windows hangkimenet-választó és az Equalizer APO eszközbeállítása.
+• Az új élő sztereó hangmérő külön mutatja a bal és jobb csatorna jelszintjét, az aktuális boostot és a clippinget.
+
 V1.3.23 – SZÖVEGJAVÍTÁS
 • Az automatikus indítás beállításának helyes szövege mostantól: „Automatikus indítás a Windowssal”.
 
@@ -2203,17 +2268,27 @@ function Disable-SoundLiftEffects {
     }
 }
 
-$BypassButton.Add_Click({
-    $answer = [System.Windows.MessageBox]::Show('A biztonságos mód kikapcsolja a SoundLift összes hanghatását, és visszaállítja az Equalizer APO eredeti hangját. Folytatod?', 'SoundLift – Biztonságos mód', 'YesNo', 'Warning')
-    if ($answer -ne 'Yes') { return }
+function Invoke-SoundLiftBypass([bool]$Confirm = $true) {
+    if ($Confirm) {
+        $answer = [System.Windows.MessageBox]::Show('A biztonságos mód kikapcsolja a SoundLift összes hanghatását, és visszaállítja az Equalizer APO eredeti hangját. Folytatod?', 'SoundLift – Biztonságos mód', 'YesNo', 'Warning')
+        if ($answer -ne 'Yes') { return }
+    }
     try {
         Disable-SoundLiftEffects
+        $script:isBypassed = $true
         $StatusText.Text = 'Biztonságos mód aktív • az eredeti hang visszaállítva'; $StatusBorder.Background = '#4A1F2D'
     } catch {
         Write-SoundLiftLog -Category crash -EventName 'handled_runtime_error' -Severity error -Data @{ component='safe_mode' } -ErrorRecord $_
         [System.Windows.MessageBox]::Show("A biztonságos mód nem kapcsolható be:`n$($_.Exception.Message)", 'SoundLift – hiba', 'OK', 'Error') | Out-Null
     }
-})
+}
+
+function Disable-SoundLiftBypass {
+    $script:isBypassed = $false
+    Invoke-ApplyButton
+}
+
+$BypassButton.Add_Click({ Invoke-SoundLiftBypass $true })
 $DeviceButton.Add_Click({
     $apoConfig = Get-ApoConfigDirectory
     $installDirectory = if ($apoConfig) { Split-Path $apoConfig -Parent } else { $null }
@@ -2416,6 +2491,41 @@ $deviceTimer.Interval = [TimeSpan]::FromSeconds(5)
 $deviceTimer.Add_Tick({ Update-DeviceText })
 $deviceTimer.Start(); Update-DeviceText
 
+# Live Windows Core Audio peak meter. Values are read locally from the current
+# default output and are never stored or sent to the backend.
+$script:lastLeftPeak = 0.0
+$script:lastRightPeak = 0.0
+function Update-LiveAudioMeter {
+    try {
+        $peaks = [AudioAppNative]::GetDefaultOutputPeaks()
+        $left = [Math]::Min(100.0, [Math]::Max([double]$peaks[0] * 100.0, $script:lastLeftPeak * 0.72))
+        $right = [Math]::Min(100.0, [Math]::Max([double]$peaks[1] * 100.0, $script:lastRightPeak * 0.72))
+        $script:lastLeftPeak = $left; $script:lastRightPeak = $right
+        $LeftPeakMeter.Value = $left; $RightPeakMeter.Value = $right
+        $LeftPeakText.Text = "$([Math]::Round($left))%"; $RightPeakText.Text = "$([Math]::Round($right))%"
+        $volumeBoost = if ([double]$VolumeSlider.Value -le 0) { -100.0 } else { 20.0 * [Math]::Log10([double]$VolumeSlider.Value / 100.0) }
+        $LiveBoostText.Text = if ($volumeBoost -le -90) { 'Boost: némítva' } else { 'Boost: {0:+0.0;-0.0;0.0} dB' -f $volumeBoost }
+        $peak = [Math]::Max($left, $right)
+        if ($peak -ge 98.5) {
+            $LiveClipText.Text = 'CLIPPING'; $LiveClipText.Foreground = '#FB7185'
+            $LeftPeakMeter.Foreground = '#FB7185'; $RightPeakMeter.Foreground = '#FB7185'
+        } elseif ($peak -ge 85) {
+            $LiveClipText.Text = 'MAGAS JELSZINT'; $LiveClipText.Foreground = '#FBBF24'
+            $LeftPeakMeter.Foreground = '#FBBF24'; $RightPeakMeter.Foreground = '#FBBF24'
+        } elseif ($peak -gt 0.5) {
+            $LiveClipText.Text = 'AKTÍV'; $LiveClipText.Foreground = '#4ADE80'
+            $LeftPeakMeter.Foreground = $window.Resources['AccentTextBrush']; $RightPeakMeter.Foreground = $window.Resources['AccentTextBrush']
+        } else {
+            $LiveClipText.Text = 'NINCS JEL'; $LiveClipText.Foreground = '#64748B'
+            $LeftPeakMeter.Foreground = $window.Resources['AccentTextBrush']; $RightPeakMeter.Foreground = $window.Resources['AccentTextBrush']
+        }
+    } catch { }
+}
+$audioMeterTimer = New-Object Windows.Threading.DispatcherTimer
+$audioMeterTimer.Interval = [TimeSpan]::FromMilliseconds(100)
+$audioMeterTimer.Add_Tick({ Update-LiveAudioMeter })
+$audioMeterTimer.Start()
+
 # Global hotkeys. These also work while a game is focused.
 $script:hotKeyButtons = @($MusicButton, $GameButton, $CombatButton, $R6Button, $DiscordButton, $MovieButton)
 
@@ -2554,7 +2664,7 @@ $window.Add_SourceInitialized({
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.3.23'
+$script:trayIcon.Text = 'SoundLift V1.3.24'
 $script:trayIcon.Visible = $true
 $trayMenu = New-Object Windows.Forms.ContextMenuStrip
 $showItem = $trayMenu.Items.Add('Megnyitás')
@@ -2572,6 +2682,8 @@ $script:trayProfileItems = @()
 foreach ($entry in $trayProfiles) {
     $profileButton = $entry[1]
     $item = $profileMenu.DropDownItems.Add([string]$entry[0])
+    $item.CheckOnClick = $false
+    $item.Tag = [string]$entry[0]
     $item.Add_Click({ $profileButton.RaiseEvent((New-Object Windows.RoutedEventArgs([Windows.Controls.Button]::ClickEvent))); Invoke-ApplyButton }.GetNewClosure())
     $script:trayProfileItems += $item
 }
@@ -2581,10 +2693,46 @@ $searchBox.Add_TextChanged({
     foreach($profileItem in $script:trayProfileItems){$profileItem.Visible=[string]::IsNullOrWhiteSpace($query) -or $profileItem.Text.IndexOf($query,[StringComparison]::OrdinalIgnoreCase)-ge 0}
     $profileMenu.ShowDropDown()
 }.GetNewClosure())
+$volumeMenu = New-Object Windows.Forms.ToolStripMenuItem -ArgumentList 'Hangerő'
+$volumeDownItem = $volumeMenu.DropDownItems.Add('− 5%')
+$volumeDownItem.Add_Click({ $VolumeSlider.Value=[Math]::Max(0,[int]$VolumeSlider.Value-5); Invoke-ApplyButton })
+$volumeUpItem = $volumeMenu.DropDownItems.Add('+ 5%')
+$volumeUpItem.Add_Click({ $VolumeSlider.Value=[Math]::Min(300,[int]$VolumeSlider.Value+5); Invoke-ApplyButton })
+[void]$volumeMenu.DropDownItems.Add('-')
+$script:trayVolumeItems = @()
+foreach ($volumeLevel in @(0,50,100,125,150,175,200,250,300)) {
+    $targetVolume = [int]$volumeLevel
+    $volumeItem = New-Object Windows.Forms.ToolStripMenuItem -ArgumentList "$targetVolume%"
+    $volumeItem.Tag = $targetVolume
+    $volumeItem.Add_Click({ $VolumeSlider.Value=$targetVolume; $script:isQuickMuted=($targetVolume -eq 0); Invoke-ApplyButton }.GetNewClosure())
+    [void]$volumeMenu.DropDownItems.Add($volumeItem); $script:trayVolumeItems += $volumeItem
+}
+[void]$trayMenu.Items.Add($volumeMenu)
 $muteItem = $trayMenu.Items.Add('Gyors némítás')
 $muteItem.Add_Click({ Invoke-QuickMute })
+$bypassItem = $trayMenu.Items.Add('SoundLift bypass')
+$bypassItem.Add_Click({ if($script:isBypassed){Disable-SoundLiftBypass}else{Invoke-SoundLiftBypass $false} })
+$deviceMenu = New-Object Windows.Forms.ToolStripMenuItem -ArgumentList 'Hangeszköz váltása'
+$currentDeviceItem = New-Object Windows.Forms.ToolStripMenuItem -ArgumentList 'Aktív: betöltés…'; $currentDeviceItem.Enabled=$false; [void]$deviceMenu.DropDownItems.Add($currentDeviceItem)
+[void]$deviceMenu.DropDownItems.Add('-')
+$windowsSoundItem = $deviceMenu.DropDownItems.Add('Windows hangkimenet választó')
+$windowsSoundItem.Add_Click({ try { Start-Process 'ms-settings:sound' } catch { } })
+$apoDeviceItem = $deviceMenu.DropDownItems.Add('Equalizer APO eszközbeállítás')
+$apoDeviceItem.Add_Click({ $DeviceButton.RaiseEvent((New-Object Windows.RoutedEventArgs([Windows.Controls.Button]::ClickEvent))) })
+[void]$trayMenu.Items.Add($deviceMenu)
 $dndItem = New-Object Windows.Forms.ToolStripMenuItem -ArgumentList 'Ne zavarjanak mód'; $dndItem.CheckOnClick=$true; $dndItem.Checked=$script:doNotDisturb
 $dndItem.Add_CheckedChanged({$script:doNotDisturb=$dndItem.Checked; $DoNotDisturbCheck.IsChecked=$script:doNotDisturb}.GetNewClosure()); [void]$trayMenu.Items.Add($dndItem)
+$trayMenu.Add_Opening({
+    $volumeMenu.Text="Hangerő • $([int]$VolumeSlider.Value)%"
+    foreach($volumeItem in $script:trayVolumeItems){$volumeItem.Checked=([int]$volumeItem.Tag -eq [int]$VolumeSlider.Value)}
+    $muteItem.Text=if($script:isQuickMuted){'Hang visszakapcsolása'}else{'Gyors némítás'}
+    $bypassItem.Text=if($script:isBypassed){'SoundLift visszakapcsolása'}else{'SoundLift bypass'}
+    $bypassItem.Checked=$script:isBypassed
+    $currentDeviceItem.Text="Aktív: $([AudioAppNative]::GetDefaultOutputName())"
+    $profileNames=@{'Music'='Zene';'FiveM RP'='FiveM RP';'FiveM Combat'='FiveM PvP';'R6'='Rainbow Six Siege';'Discord'='Discord';'Movie'='Film'}
+    $activeTrayName=$profileNames[[string]$script:activeProfile]
+    foreach($profileItem in $script:trayProfileItems){$profileItem.Checked=($profileItem.Text -eq $activeTrayName)}
+})
 [void]$trayMenu.Items.Add('-')
 $exitItem = $trayMenu.Items.Add('Kilépés')
 $exitItem.Add_Click({ $script:reallyExit = $true; $window.Close() })
@@ -2603,6 +2751,7 @@ $window.Add_Closing({
 })
 $window.Add_Closed({
     $presenceTimer.Stop()
+    $audioMeterTimer.Stop()
     if($script:discordPresencePipe){[void](Set-SoundLiftDiscordPresence '');Disconnect-SoundLiftDiscordPresence}
     for ($i = 0; $i -lt 7; $i++) { [void][AudioAppNative]::UnregisterHotKey($script:windowHandle, 101 + $i) }
     if ($script:windowSource) { $script:windowSource.RemoveHook($script:hotKeyHook) }
