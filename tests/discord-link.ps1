@@ -63,8 +63,8 @@ foreach($requiredFreeKeyFeature in @('$singleKeys=@($bindings|Where-Object','mod
 }
 foreach ($requiredTrayMeterFeature in @(
     'GetDefaultOutputPeaks', 'IAudioMeterInformation', 'LeftPeakMeter', 'RightPeakMeter',
-    'LiveBoostText', 'LiveClipText', 'Hangerő •', 'SoundLift bypass',
-    'Windows hangkimenet választó', 'Equalizer APO eszközbeállítás', 'audioMeterTimer'
+    'LiveBoostText', 'LiveClipText', '$volumeMenu.Text=', '$bypassItem.Add_Click',
+    '$windowsSoundItem.Add_Click', '$apoDeviceItem.Add_Click', 'audioMeterTimer'
 )) {
     if (-not $source.Contains($requiredTrayMeterFeature)) { throw "Missing V1.3.24 tray or live meter behavior: $requiredTrayMeterFeature" }
 }
