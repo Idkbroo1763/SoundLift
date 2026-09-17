@@ -17,7 +17,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.3.21'
+$script:appVersion = '1.3.22'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -558,7 +558,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.3.21" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
+        Title="SoundLift V1.3.22" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -718,7 +718,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.3.21" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.3.22" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="#171719" CornerRadius="13" Padding="16,11" BorderBrush="#303035" BorderThickness="1">
         <StackPanel>
@@ -804,7 +804,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.3.21" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.3.22" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="#94A3B8" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="#94A3B8" FontSize="11" Margin="4,5,0,4"/>
@@ -1909,6 +1909,12 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.3.22 – TELJESEN SZABAD GYORSBILLENTYŰK
+• A profilok most már önálló betűhöz, számhoz, írásjelhez és egyéb használható billentyűhöz is rendelhetők.
+• A számok D1 helyett olvashatóan 1 formában jelennek meg.
+• Minden sor külön törlőgombot kapott, így a Backspace, Delete és Escape is használható gyorsbillentyűként.
+• Az önálló billentyűk mentése előtt a SoundLift figyelmeztet, hogy gépelés közben is aktiválhatják a profilt.
+
 V1.3.21 – DISCORD ZENEÁLLAPOT
 • Bekapcsolható SoundLift Rich Presence jeleníti meg a Spotify aktuális számát és az aktív hangprofilt.
 • A számadat kizárólag a helyi Discord asztali klienshez kerül; a SoundLift backendje és naplózása nem kapja meg.
@@ -2428,7 +2434,8 @@ function Register-SoundLiftHotKeys {
     for ($i = 0; $i -lt 7; $i++) {
         $binding = $script:hotKeyBindings[$i]
         if ([int]$binding.key -eq 0) { continue }
-        if (-not [AudioAppNative]::RegisterHotKey($script:windowHandle, 101 + $i, [uint32]$binding.modifiers, [uint32]$binding.key)) {
+        $nativeModifiers = [uint32]([int]$binding.modifiers -bor 0x4000)
+        if (-not [AudioAppNative]::RegisterHotKey($script:windowHandle, 101 + $i, $nativeModifiers, [uint32]$binding.key)) {
             throw "A(z) $(Get-SoundLiftHotKeyText $binding) kombinációt egy másik program már használja."
         }
     }
@@ -2441,12 +2448,14 @@ function Get-SoundLiftHotKeyText($binding) {
     if ($modifiers -band 1) { $parts.Add('Alt') }
     if ($modifiers -band 4) { $parts.Add('Shift') }
     if ($modifiers -band 8) { $parts.Add('Win') }
-    $key = [Windows.Input.KeyInterop]::KeyFromVirtualKey([int]$binding.key)
-    $keyText = switch ([string]$key) {
+    $key = [Windows.Input.KeyInterop]::KeyFromVirtualKey([int]$binding.key); $keyName=[string]$key
+    if($keyName -match '^D([0-9])$'){$keyText=$Matches[1]}
+    elseif($keyName -match '^NumPad([0-9])$'){$keyText="Num $($Matches[1])"}
+    else{$keyText = switch ($keyName) {
         'Return' {'Enter'} 'Escape' {'Esc'} 'Back' {'Backspace'} 'Next' {'PageDown'} 'Prior' {'PageUp'}
         'OemPlus' {'+'} 'OemMinus' {'-'} 'OemComma' {','} 'OemPeriod' {'.'} 'Space' {'Szóköz'}
-        default { [string]$key }
-    }
+        default { $keyName }
+    }}
     $parts.Add($keyText); return ($parts -join ' + ')
 }
 
@@ -2454,7 +2463,6 @@ function Test-SoundLiftHotKeyBinding($binding) {
     $key=[int]$binding.key; $modifiers=[int]$binding.modifiers
     if ($key -eq 0) { return $null }
     if ($key -in @(0x10,0x11,0x12,0x5B,0x5C)) { return 'Önmagában módosítóbillentyű nem használható.' }
-    if ($modifiers -eq 0 -and ($key -lt 0x70 -or $key -gt 0x87)) { return 'Önmagában csak az F1–F24 funkcióbillentyűk használhatók.' }
     if (($modifiers -band 1) -and $key -eq 0x73) { return 'Az Alt + F4 rendszerparancs nem állítható be.' }
     if (($modifiers -band 8) -and $key -in @(0x44,0x4C)) { return 'Ez a Windows rendszerparancs nem állítható be.' }
     if (($modifiers -band 3) -eq 3 -and $key -eq 0x2E) { return 'A Ctrl + Alt + Delete rendszerparancs nem állítható be.' }
@@ -2467,19 +2475,20 @@ function Show-HotkeyEditor {
     $root=[Windows.Controls.Grid]::new(); $root.Margin=[Windows.Thickness]::new(26)
     $root.RowDefinitions.Add([Windows.Controls.RowDefinition]::new()); $actionsRow=[Windows.Controls.RowDefinition]::new(); $actionsRow.Height=[Windows.GridLength]::Auto; $root.RowDefinitions.Add($actionsRow)
     $panel=[Windows.Controls.StackPanel]::new(); $title=[Windows.Controls.TextBlock]::new(); $title.Text='Billentyűparancsok'; $title.FontSize=23; $title.FontWeight='Bold'; $title.Foreground=$window.Resources['AccentTextBrush']; $title.Margin=[Windows.Thickness]::new(0,0,0,5)
-    $hint=[Windows.Controls.TextBlock]::new(); $hint.Text='Kattints egy mezőre, majd nyomd le a kívánt kombinációt. Backspace = kikapcsolás. Az F1–F24 billentyűk önmagukban is használhatók.'; $hint.TextWrapping='Wrap'; $hint.Foreground='#94A3B8'; $hint.Margin=[Windows.Thickness]::new(0,0,0,15)
+    $hint=[Windows.Controls.TextBlock]::new(); $hint.Text='Kattints egy mezőre, majd nyomj le bármilyen betűt, számot, funkcióbillentyűt vagy kombinációt. Az × gomb kikapcsolja az adott parancsot.'; $hint.TextWrapping='Wrap'; $hint.Foreground='#94A3B8'; $hint.Margin=[Windows.Thickness]::new(0,0,0,15)
     [void]$panel.Children.Add($title); [void]$panel.Children.Add($hint)
     $labels=@('Zene','FiveM RP','FiveM PvP','Rainbow Six Siege','Discord','Film','Gyors némítás'); $selectors=@()
     for($i=0;$i -lt $labels.Count;$i++) {
         $row=[Windows.Controls.DockPanel]::new(); $row.Margin=[Windows.Thickness]::new(0,0,0,8)
         $label=[Windows.Controls.TextBlock]::new(); $label.Text=$labels[$i]; $label.Width=250; $label.VerticalAlignment='Center'; $label.FontWeight='SemiBold'
-        $capture=[Windows.Controls.TextBox]::new(); $capture.Width=240; $capture.Height=34; $capture.HorizontalAlignment='Right'; $capture.IsReadOnly=$true; $capture.Cursor='Hand'; $capture.VerticalContentAlignment='Center'; $capture.Padding=[Windows.Thickness]::new(10,0,10,0)
+        $right=[Windows.Controls.StackPanel]::new();$right.Orientation='Horizontal';$right.HorizontalAlignment='Right'
+        $capture=[Windows.Controls.TextBox]::new(); $capture.Width=198; $capture.Height=34; $capture.IsReadOnly=$true; $capture.Cursor='Hand'; $capture.VerticalContentAlignment='Center'; $capture.Padding=[Windows.Thickness]::new(10,0,10,0)
+        $clear=[Windows.Controls.Button]::new();$clear.Content='×';$clear.Width=34;$clear.Height=34;$clear.Margin=[Windows.Thickness]::new(8,0,0,0);$clear.ToolTip='Billentyűparancs kikapcsolása';$clear.Style=$window.Resources['UtilityButton'];$clear.Tag=$capture
         $capture.Tag=[PSCustomObject]@{ modifiers=[int]$script:hotKeyBindings[$i].modifiers; key=[int]$script:hotKeyBindings[$i].key }; $capture.Text=Get-SoundLiftHotKeyText $capture.Tag
         $capture.Add_GotKeyboardFocus({ param($sender,$eventArgs) $sender.Text='Nyomd le a kombinációt…'; $sender.SelectAll() })
         $capture.Add_PreviewKeyDown({
             param($sender,$eventArgs)
             $eventArgs.Handled=$true; $pressedKey=if($eventArgs.Key -eq [Windows.Input.Key]::System){$eventArgs.SystemKey}else{$eventArgs.Key}
-            if($pressedKey -eq [Windows.Input.Key]::Back){$sender.Tag=[PSCustomObject]@{modifiers=0;key=0};$sender.Text='Nincs beállítva';return}
             if($pressedKey -in @([Windows.Input.Key]::LeftCtrl,[Windows.Input.Key]::RightCtrl,[Windows.Input.Key]::LeftAlt,[Windows.Input.Key]::RightAlt,[Windows.Input.Key]::LeftShift,[Windows.Input.Key]::RightShift,[Windows.Input.Key]::LWin,[Windows.Input.Key]::RWin)){return}
             $mods=0; $active=[Windows.Input.Keyboard]::Modifiers
             if($active -band [Windows.Input.ModifierKeys]::Control){$mods=$mods-bor 2};if($active -band [Windows.Input.ModifierKeys]::Alt){$mods=$mods-bor 1};if($active -band [Windows.Input.ModifierKeys]::Shift){$mods=$mods-bor 4};if($active -band [Windows.Input.ModifierKeys]::Windows){$mods=$mods-bor 8}
@@ -2487,15 +2496,21 @@ function Show-HotkeyEditor {
             if($problem){[System.Windows.MessageBox]::Show($problem,'Nem használható billentyűparancs','OK','Warning')|Out-Null;$sender.Text=Get-SoundLiftHotKeyText $sender.Tag;return}
             $sender.Tag=$candidate;$sender.Text=Get-SoundLiftHotKeyText $candidate
         })
-        [Windows.Controls.DockPanel]::SetDock($capture,'Right'); [void]$row.Children.Add($capture); [void]$row.Children.Add($label); [void]$panel.Children.Add($row); $selectors += $capture
+        $clear.Add_Click({param($sender,$eventArgs)$target=$sender.Tag;$target.Tag=[PSCustomObject]@{modifiers=0;key=0};$target.Text='Nincs beállítva'})
+        [void]$right.Children.Add($capture);[void]$right.Children.Add($clear);[Windows.Controls.DockPanel]::SetDock($right,'Right'); [void]$row.Children.Add($right); [void]$row.Children.Add($label); [void]$panel.Children.Add($row); $selectors += $capture
     }
     $buttons=[Windows.Controls.StackPanel]::new(); $buttons.Orientation='Horizontal'; $buttons.HorizontalAlignment='Right'; $buttons.Margin=[Windows.Thickness]::new(0,14,0,0)
     $cancel=[Windows.Controls.Button]::new(); $cancel.Content='Mégse'; $cancel.Width=100; $cancel.Margin=[Windows.Thickness]::new(0,0,10,0); $cancel.Style=$window.Resources['UtilityButton']
     $save=[Windows.Controls.Button]::new(); $save.Content='Mentés'; $save.Width=120; $save.Style=$window.Resources['PrimaryButton']
     $cancel.Add_Click({$dialog.Close()}.GetNewClosure())
     $save.Add_Click({
-        $bindings=@($selectors|ForEach-Object{$_.Tag});$activeSignatures=@($bindings|Where-Object{[int]$_.key-ne 0}|ForEach-Object{"$($_.modifiers):$($_.key)"})
+        $bindings=@($selectors|ForEach-Object{$_.Tag});$activeSignatures=@($bindings|Where-Object{[int]$_.key -ne 0}|ForEach-Object{"$($_.modifiers):$($_.key)"})
         if ((@($activeSignatures|Select-Object -Unique)).Count -ne $activeSignatures.Count) { [System.Windows.MessageBox]::Show('Ugyanaz a kombináció csak egy parancshoz használható.', 'Billentyűütközés', 'OK', 'Warning')|Out-Null; return }
+        $singleKeys=@($bindings|Where-Object{[int]$_.key -ne 0 -and [int]$_.modifiers -eq 0})
+        if($singleKeys.Count -gt 0){
+            $answer=[System.Windows.MessageBox]::Show('Önálló billentyűt is beállítottál. Ez gépelés és játék közben is aktiválhatja a hozzárendelt profilt. Biztosan mented?','Önálló gyorsbillentyű','YesNo','Warning')
+            if($answer -ne 'Yes'){return}
+        }
         $previous=@($script:hotKeyBindings); $script:hotKeyBindings=@($bindings|ForEach-Object{[PSCustomObject]@{modifiers=[int]$_.modifiers;key=[int]$_.key}});$script:hotKeyVirtualKeys=@($script:hotKeyBindings|ForEach-Object{[int]$_.key})
         try { Register-SoundLiftHotKeys; $dialog.Close(); $StatusText.Text='A billentyűparancsok mentve'; (Get-AppState)|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $settingsPath -Encoding UTF8 } catch { $script:hotKeyBindings=$previous; $script:hotKeyVirtualKeys=@($previous|ForEach-Object{[int]$_.key}); Register-SoundLiftHotKeys; [System.Windows.MessageBox]::Show($_.Exception.Message,'Billentyűütközés','OK','Warning')|Out-Null }
     }.GetNewClosure())
@@ -2536,7 +2551,7 @@ $window.Add_SourceInitialized({
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.3.21'
+$script:trayIcon.Text = 'SoundLift V1.3.22'
 $script:trayIcon.Visible = $true
 $trayMenu = New-Object Windows.Forms.ContextMenuStrip
 $showItem = $trayMenu.Items.Add('Megnyitás')

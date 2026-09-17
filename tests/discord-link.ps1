@@ -29,7 +29,7 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '1.3.21'")) { throw 'Application version was not updated to 1.3.21' }
+if (-not $source.Contains("`$script:appVersion = '1.3.22'")) { throw 'Application version was not updated to 1.3.22' }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
     if (-not $source.Contains("function $requiredFeature")) { throw "Missing required SoundLift feature: $requiredFeature" }
 }
@@ -47,8 +47,9 @@ foreach ($requiredControlFeature in @(
 foreach ($requiredCustomHotkeyFeature in @(
  'version = 8',
  'modifiers=[int]$_.modifiers; key=[int]$_.key',
- '$modifiers -eq 0 -and ($key -lt 0x70 -or $key -gt 0x87)',
- '$pressedKey -eq [Windows.Input.Key]::Back',
+ "`$keyName -match '^D([0-9])`$'",
+ 'nativeModifiers = [uint32]([int]$binding.modifiers -bor 0x4000)',
+ '$clear=[Windows.Controls.Button]::new()',
  '$activeSignatures|Select-Object -Unique',
  '($modifiers -band 3) -eq 3 -and $key -eq 0x2E',
  'if ([int]$binding.key -eq 0) { continue }'
@@ -56,6 +57,10 @@ foreach ($requiredCustomHotkeyFeature in @(
     if (-not $source.Contains($requiredCustomHotkeyFeature)) { throw "Missing V1.3.20 custom hotkey behavior: $requiredCustomHotkeyFeature" }
 }
 if ($source.Contains('Minden parancs Ctrl+Alt + a kiválasztott szám')) { throw 'Legacy number-only hotkey editor is still present' }
+if ($source.Contains('Önmagában csak az F1–F24 funkcióbillentyűk használhatók.')) { throw 'Single-key shortcuts are still limited to function keys' }
+foreach($requiredFreeKeyFeature in @('$singleKeys=@($bindings|Where-Object','modifiers -eq 0',"`$answer -ne 'Yes'")){
+    if(-not $source.Contains($requiredFreeKeyFeature)){throw "Missing V1.3.22 unrestricted shortcut behavior: $requiredFreeKeyFeature"}
+}
 foreach ($requiredPresenceFeature in @(
  "discordApplicationId = '1547231878577393716'",
  'DiscordPresenceCheck',
@@ -142,7 +147,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='1.3.21'
+ $script:appVersion='1.3.22'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }
