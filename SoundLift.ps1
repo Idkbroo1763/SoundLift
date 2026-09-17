@@ -17,13 +17,16 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.3.20'
+$script:appVersion = '1.3.21'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
 $script:isQuickMuted = $false
 $script:preMuteVolume = 100
 $script:onboardingCompleted = $false
+$script:discordApplicationId = '1547231878577393716'
+$script:discordPresencePipe = $null
+$script:lastDiscordPresenceSignature = ''
 # A kiadott alkalmazás univerzális: ingyenes módban indul, és ugyanabban az
 # EXE-ben aktiválható customer vagy developer licenc.
 $script:licenseMode = 'free'
@@ -555,7 +558,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.3.20" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
+        Title="SoundLift V1.3.21" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -715,7 +718,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.3.20" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.3.21" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="#171719" CornerRadius="13" Padding="16,11" BorderBrush="#303035" BorderThickness="1">
         <StackPanel>
@@ -801,7 +804,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.3.20" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.3.21" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="#94A3B8" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="#94A3B8" FontSize="11" Margin="4,5,0,4"/>
@@ -854,6 +857,7 @@ $xaml = @'
                   <CheckBox Name="InstantCheck" Content="Módosítások azonnali alkalmazása"/>
                   <CheckBox Name="StartupCheck" Content="Automatikus indítás a Windowszal"/>
                   <CheckBox Name="DoNotDisturbCheck" Content="Ne zavarjanak mód" ToolTip="Játék közben elrejti a nem fontos felugró értesítéseket."/>
+                  <CheckBox Name="DiscordPresenceCheck" Content="Discord zeneállapot" ToolTip="Az aktuális Spotify-számot helyben megjeleníti Discord Rich Presence-ként. A zeneadat nem kerül a SoundLift szerverére."/>
                 </WrapPanel>
               </StackPanel>
               <Border Grid.Column="1" Background="#12291F" CornerRadius="9" Padding="12,7" VerticalAlignment="Center">
@@ -953,7 +957,7 @@ $appIconPath = Join-Path $script:appDirectory 'SoundLift.ico'
 if (Test-Path $appIconPath) {
     try { $window.Icon = [Windows.Media.Imaging.BitmapFrame]::Create([Uri]$appIconPath) } catch { }
 }
-$names = @('StatusBorder','StatusText','DeviceText','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','ClipText','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
+$names = @('StatusBorder','StatusText','DeviceText','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','DiscordPresenceCheck','ClipText','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
 $VolumeSlider.ToolTip = 'A teljes hangerő erősítése 0 és 300% között.'
 $BassSlider.ToolTip = 'A mélyhangok kiemelése. Nagy értéknél használd a torzításvédelmet.'
@@ -1234,11 +1238,12 @@ function Invoke-ApplyButton {
 
 function Get-AppState {
     return [PSCustomObject]@{
-        version = 7; profile = $script:activeProfile; theme = $script:themeName
+        version = 8; profile = $script:activeProfile; theme = $script:themeName
         onboardingCompleted = [bool]$script:onboardingCompleted
         volume = [int]$VolumeSlider.Value; bass = [int]$BassSlider.Value; frequency = [int]$FrequencySlider.Value
         safety = [bool]$SafetyCheck.IsChecked; autoProfile = [bool]$AutoProfileCheck.IsChecked; instant = [bool]$InstantCheck.IsChecked
         doNotDisturb = [bool]$DoNotDisturbCheck.IsChecked
+        discordPresence = [bool]$DiscordPresenceCheck.IsChecked
         hotkeys = @($script:hotKeyBindings | ForEach-Object { [PSCustomObject]@{ modifiers=[int]$_.modifiers; key=[int]$_.key } })
         eq = @($script:eqSliders | ForEach-Object { [int]$_.Value })
     }
@@ -1252,6 +1257,7 @@ function Set-AppState($state) {
     if ($null -ne $state.autoProfile) { $AutoProfileCheck.IsChecked = [bool]$state.autoProfile }
     if ($null -ne $state.instant) { $InstantCheck.IsChecked = [bool]$state.instant }
     if ($null -ne $state.doNotDisturb) { $DoNotDisturbCheck.IsChecked = [bool]$state.doNotDisturb; $script:doNotDisturb = [bool]$state.doNotDisturb }
+    if ($null -ne $state.discordPresence) { $DiscordPresenceCheck.IsChecked = [bool]$state.discordPresence }
     if ($state.hotkeys -and $state.hotkeys.Count -eq 7) {
         if ($state.hotkeys[0] -is [ValueType]) {
             # V1.3.19 és korábbi beállítások: Ctrl+Alt + eltárolt virtuális billentyű.
@@ -1886,6 +1892,9 @@ MIT NEM KÜLDÜNK?
 • Discord-üzeneteket, szerverlistát vagy böngészési előzményeket;
 • személyes fájlokat és azok tartalmát.
 
+OPCIONÁLIS DISCORD ZENEÁLLAPOT
+Bekapcsolásakor a SoundLift a Spotify ablakcíméből helyben kiolvassa az aktuális szám megjelenített címét, és közvetlenül a számítógépen futó Discord kliensnek adja át Rich Presence megjelenítéshez. A szám címe nem kerül a SoundLift backendjére, technikai naplóiba vagy hibajelentéseibe. Kikapcsoláskor a SoundLift törli a saját Discord-aktivitását.
+
 TÁROLÁS ÉS BIZTONSÁG
 A helyi technikai naplók a %LOCALAPPDATA%\SoundLift\logs mappában találhatók, és 14 nap után automatikusan törlődnek. A sikertelenül továbbított események titkos adat nélkül várólistára kerülnek, majd a következő indításkor újrapróbáljuk őket. A továbbított naplók a SoundLift támogatási rendszerében addig maradnak meg, amíg hibakeresési vagy biztonsági célból szükségesek.
 
@@ -1900,6 +1909,12 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.3.21 – DISCORD ZENEÁLLAPOT
+• Bekapcsolható SoundLift Rich Presence jeleníti meg a Spotify aktuális számát és az aktív hangprofilt.
+• A számadat kizárólag a helyi Discord asztali klienshez kerül; a SoundLift backendje és naplózása nem kapja meg.
+• A jelenlét automatikusan frissül szám- vagy profilváltáskor, Spotify leállításakor pedig törlődik.
+• A funkció alapból kikapcsolt, és a Védelem és automatizálás résznél engedélyezhető.
+
 V1.3.20 – TELJES BILLENTYŰPARANCS-SZERKESZTŐ
 • A profilok és a gyors némítás tetszőleges biztonságos billentyűkombinációhoz rendelhető.
 • A kívánt kombináció közvetlen lenyomással rögzíthető; az F1–F24 billentyűk önmagukban is használhatók.
@@ -2245,6 +2260,90 @@ $FrequencySlider.Add_ValueChanged($scheduleInstant)
 $SafetyCheck.Add_Click({ Update-Labels; if ($InstantCheck.IsChecked) { Invoke-ApplyButton } })
 foreach ($eqSlider in $script:eqSliders) { $eqSlider.Add_ValueChanged($scheduleInstant) }
 
+function Write-DiscordPresenceFrame([IO.Pipes.NamedPipeClientStream]$pipe, [int]$opcode, [hashtable]$payload) {
+    $json = $payload | ConvertTo-Json -Depth 8 -Compress
+    $body = [Text.UTF8Encoding]::new($false).GetBytes($json)
+    $header = New-Object byte[] 8
+    [BitConverter]::GetBytes([int]$opcode).CopyTo($header, 0)
+    [BitConverter]::GetBytes([int]$body.Length).CopyTo($header, 4)
+    $pipe.Write($header, 0, $header.Length); $pipe.Write($body, 0, $body.Length); $pipe.Flush()
+}
+
+function Read-DiscordPresenceFrame([IO.Pipes.NamedPipeClientStream]$pipe) {
+    $header = New-Object byte[] 8; $offset = 0
+    while ($offset -lt 8) { $read=$pipe.Read($header,$offset,8-$offset); if($read -le 0){throw 'A Discord IPC-kapcsolat megszakadt.'};$offset+=$read }
+    $length=[BitConverter]::ToInt32($header,4); if($length -lt 0 -or $length -gt 1048576){throw 'Érvénytelen Discord IPC-válasz.'}
+    $body=New-Object byte[] $length;$offset=0
+    while($offset -lt $length){$read=$pipe.Read($body,$offset,$length-$offset);if($read -le 0){throw 'A Discord IPC-kapcsolat megszakadt.'};$offset+=$read}
+    if($length -eq 0){return $null};return ([Text.Encoding]::UTF8.GetString($body)|ConvertFrom-Json)
+}
+
+function Disconnect-SoundLiftDiscordPresence {
+    if($script:discordPresencePipe){try{$script:discordPresencePipe.Dispose()}catch{};$script:discordPresencePipe=$null}
+    $script:lastDiscordPresenceSignature=''
+}
+
+function Connect-SoundLiftDiscordPresence {
+    if($script:discordPresencePipe -and $script:discordPresencePipe.IsConnected){return $true}
+    Disconnect-SoundLiftDiscordPresence
+    if(-not (Get-Process Discord -ErrorAction SilentlyContinue)){return $false}
+    foreach($index in 0..9){
+        try {
+            $pipe=[IO.Pipes.NamedPipeClientStream]::new('.',"discord-ipc-$index",[IO.Pipes.PipeDirection]::InOut,[IO.Pipes.PipeOptions]::None)
+            $pipe.Connect(80);$pipe.ReadTimeout=1000;$pipe.WriteTimeout=1000
+            Write-DiscordPresenceFrame $pipe 0 @{v=1;client_id=$script:discordApplicationId}
+            $reply=Read-DiscordPresenceFrame $pipe
+            if($reply.evt -eq 'READY'){$script:discordPresencePipe=$pipe;return $true}
+            $pipe.Dispose()
+        } catch { if($pipe){try{$pipe.Dispose()}catch{}} }
+    }
+    return $false
+}
+
+function Get-SoundLiftSpotifyTrack {
+    $titles=@(Get-Process Spotify -ErrorAction SilentlyContinue|Where-Object{-not [string]::IsNullOrWhiteSpace($_.MainWindowTitle)}|Select-Object -ExpandProperty MainWindowTitle -Unique)
+    $title=[string]($titles|Where-Object{$_ -notmatch '^(Spotify|Spotify Premium|Advertisement)$'}|Select-Object -First 1)
+    if([string]::IsNullOrWhiteSpace($title)){return $null}
+    $title=[Regex]::Replace($title,'\s+[-–—]\s+Spotify$','').Trim()
+    if($title.Length-gt 120){$title=$title.Substring(0,120)}
+    return $title
+}
+
+function Set-SoundLiftDiscordPresence([string]$track) {
+    if(-not (Connect-SoundLiftDiscordPresence)){return $false}
+    $activity=$null
+    if(-not [string]::IsNullOrWhiteSpace($track)){
+        $profile=if([string]::IsNullOrWhiteSpace($script:activeProfile)){'Egyéni'}else{$script:activeProfile}
+        $activity=@{details=$track;state="with SoundLift • $profile profil";timestamps=@{start=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()}}
+    }
+    try {
+        Write-DiscordPresenceFrame $script:discordPresencePipe 1 @{cmd='SET_ACTIVITY';args=@{pid=[Diagnostics.Process]::GetCurrentProcess().Id;activity=$activity};nonce=[Guid]::NewGuid().ToString()}
+        $reply=Read-DiscordPresenceFrame $script:discordPresencePipe
+        if($reply.evt -eq 'ERROR'){throw [string]$reply.data.message}
+        return $true
+    } catch { Disconnect-SoundLiftDiscordPresence;return $false }
+}
+
+$presenceTimer=New-Object Windows.Threading.DispatcherTimer
+$presenceTimer.Interval=[TimeSpan]::FromSeconds(8)
+$presenceTimer.Add_Tick({
+    if(-not $DiscordPresenceCheck.IsChecked){
+        if($script:lastDiscordPresenceSignature){[void](Set-SoundLiftDiscordPresence '');Disconnect-SoundLiftDiscordPresence}
+        return
+    }
+    if(-not (Get-Process Discord -ErrorAction SilentlyContinue)){Disconnect-SoundLiftDiscordPresence;return}
+    $track=Get-SoundLiftSpotifyTrack
+    $signature=if($track){"$track|$script:activeProfile"}else{''}
+    if($signature -eq $script:lastDiscordPresenceSignature -and $script:discordPresencePipe -and $script:discordPresencePipe.IsConnected){return}
+    if(Set-SoundLiftDiscordPresence $track){$script:lastDiscordPresenceSignature=$signature}
+})
+$DiscordPresenceCheck.Add_Click({
+    if($DiscordPresenceCheck.IsChecked){$StatusText.Text='Discord zeneállapot bekapcsolva';$presenceTimer.Stop();$presenceTimer.Start()}
+    else{[void](Set-SoundLiftDiscordPresence '');Disconnect-SoundLiftDiscordPresence;$StatusText.Text='Discord zeneállapot kikapcsolva'}
+    try{(Get-AppState)|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $settingsPath -Encoding UTF8}catch{}
+})
+$presenceTimer.Start()
+
 # Optional automatic switching: FiveM has priority, followed by Spotify and Discord.
 $script:lastAutoProfile = ''
 $autoTimer = New-Object Windows.Threading.DispatcherTimer
@@ -2437,7 +2536,7 @@ $window.Add_SourceInitialized({
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.3.20'
+$script:trayIcon.Text = 'SoundLift V1.3.21'
 $script:trayIcon.Visible = $true
 $trayMenu = New-Object Windows.Forms.ContextMenuStrip
 $showItem = $trayMenu.Items.Add('Megnyitás')
@@ -2485,6 +2584,8 @@ $window.Add_Closing({
     if (-not $script:reallyExit) { $eventArgs.Cancel = $true; $window.Hide() }
 })
 $window.Add_Closed({
+    $presenceTimer.Stop()
+    if($script:discordPresencePipe){[void](Set-SoundLiftDiscordPresence '');Disconnect-SoundLiftDiscordPresence}
     for ($i = 0; $i -lt 7; $i++) { [void][AudioAppNative]::UnregisterHotKey($script:windowHandle, 101 + $i) }
     if ($script:windowSource) { $script:windowSource.RemoveHook($script:hotKeyHook) }
     $script:trayIcon.Visible = $false; $script:trayIcon.Dispose()

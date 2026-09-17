@@ -29,7 +29,7 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '1.3.20'")) { throw 'Application version was not updated to 1.3.20' }
+if (-not $source.Contains("`$script:appVersion = '1.3.21'")) { throw 'Application version was not updated to 1.3.21' }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
     if (-not $source.Contains("function $requiredFeature")) { throw "Missing required SoundLift feature: $requiredFeature" }
 }
@@ -45,7 +45,7 @@ foreach ($requiredControlFeature in @(
     if (-not $source.Contains($requiredControlFeature)) { throw "Missing V1.3.15 quick-control feature: $requiredControlFeature" }
 }
 foreach ($requiredCustomHotkeyFeature in @(
- 'version = 7',
+ 'version = 8',
  'modifiers=[int]$_.modifiers; key=[int]$_.key',
  '$modifiers -eq 0 -and ($key -lt 0x70 -or $key -gt 0x87)',
  '$pressedKey -eq [Windows.Input.Key]::Back',
@@ -56,6 +56,19 @@ foreach ($requiredCustomHotkeyFeature in @(
     if (-not $source.Contains($requiredCustomHotkeyFeature)) { throw "Missing V1.3.20 custom hotkey behavior: $requiredCustomHotkeyFeature" }
 }
 if ($source.Contains('Minden parancs Ctrl+Alt + a kiválasztott szám')) { throw 'Legacy number-only hotkey editor is still present' }
+foreach ($requiredPresenceFeature in @(
+ "discordApplicationId = '1547231878577393716'",
+ 'DiscordPresenceCheck',
+ 'function Connect-SoundLiftDiscordPresence',
+ 'function Get-SoundLiftSpotifyTrack',
+ "cmd='SET_ACTIVITY'",
+ 'PipeDirection]::InOut',
+ 'discordPresence = [bool]$DiscordPresenceCheck.IsChecked',
+ 'lastDiscordPresenceSignature'
+)) {
+    if (-not $source.Contains($requiredPresenceFeature)) { throw "Missing V1.3.21 Discord presence behavior: $requiredPresenceFeature" }
+}
+if ($source -match 'Write-SoundLiftLog[^\r\n]*\$track') { throw 'Spotify track title must not be written to SoundLift logs' }
 if ($source.Contains('Check-AppUpdate -Silent')) { throw 'Blocking startup update check is still enabled' }
 $installerSource = Get-Content "$PSScriptRoot/../installer.iss" -Raw
 $uninstallerSource = Get-Content "$PSScriptRoot/../Uninstall-SoundLift.ps1" -Raw
@@ -129,7 +142,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='1.3.20'
+ $script:appVersion='1.3.21'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }
