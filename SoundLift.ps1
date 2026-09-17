@@ -17,7 +17,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.3.26'
+$script:appVersion = '1.3.27'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -594,7 +594,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.3.26" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
+        Title="SoundLift V1.3.27" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -754,7 +754,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.3.26" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.3.27" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="#171719" CornerRadius="13" Padding="16,11" BorderBrush="#303035" BorderThickness="1">
         <StackPanel>
@@ -841,7 +841,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.3.26" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.3.27" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="#94A3B8" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="#94A3B8" FontSize="11" Margin="4,5,0,4"/>
@@ -1020,6 +1020,14 @@ $appIconPath = Join-Path $script:appDirectory 'SoundLift.ico'
 if (Test-Path $appIconPath) {
     try { $window.Icon = [Windows.Media.Imaging.BitmapFrame]::Create([Uri]$appIconPath) } catch { }
 }
+# Create the notification-area icon as soon as the main window exists. It is
+# kept in script scope for the entire process lifetime, independently of the
+# main window's visibility.
+$script:reallyExit = $false
+$script:trayIcon = New-Object Windows.Forms.NotifyIcon
+$script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
+$script:trayIcon.Text = 'SoundLift V1.3.27'
+$script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
 $VolumeSlider.ToolTip = 'A teljes hangerő erősítése 0 és 300% között.'
@@ -2023,6 +2031,12 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.3.27 – SYSTEM TRAY IKON JAVÍTÁSA
+• A valódi értesítési területi ikon már a SoundLift indulásakor azonnal létrejön.
+• Az X gomb csak elrejti a főablakot; a tray ikon és a gyorsmenü aktív marad.
+• Dupla kattintással az ablak biztosan visszaáll és előtérbe kerül.
+• A tray ikon kizárólag a Kilépés menüpont használatakor kerül eltávolításra.
+
 V1.3.26 – PROFILRENDEZŐ ABLAK JAVÍTÁSA
 • A Fel, Le és Elrejtés / mutatás gombok most teljes méretben, jól láthatóan elférnek az ablakban.
 • A profillista és az alsó műveleti gombok közötti térköz rendezettebb lett.
@@ -2731,15 +2745,19 @@ $window.Add_SourceInitialized({
     try { Register-SoundLiftHotKeys } catch { $StatusText.Text=$_.Exception.Message; $StatusBorder.Background='#4A1F2D' }
 })
 
-# Tray icon: minimize or close to tray, double-click to restore.
-$script:reallyExit = $false
-$script:trayIcon = New-Object Windows.Forms.NotifyIcon
-$script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.3.26'
-$script:trayIcon.Visible = $true
+# Tray quick menu. The NotifyIcon itself was intentionally created much
+# earlier, directly after the window and icon resources were initialized.
 $trayMenu = New-Object Windows.Forms.ContextMenuStrip
 $showItem = $trayMenu.Items.Add('Megnyitás')
-$showItem.Add_Click({ $window.Show(); $window.WindowState = 'Normal'; $window.Activate() })
+function Show-SoundLiftMainWindow {
+    $window.Show()
+    $window.WindowState = [Windows.WindowState]::Normal
+    $window.ShowInTaskbar = $true
+    [void]$window.Activate()
+    $window.Topmost = $true; $window.Topmost = $false
+    [void]$window.Focus()
+}
+$showItem.Add_Click({ Show-SoundLiftMainWindow })
 [void]$trayMenu.Items.Add('-')
 $searchLabel = New-Object Windows.Forms.ToolStripLabel -ArgumentList 'Profil keresése:'; $searchLabel.ForeColor=[Drawing.Color]::Gray; [void]$trayMenu.Items.Add($searchLabel)
 $searchBox = New-Object Windows.Forms.ToolStripTextBox
@@ -2808,9 +2826,18 @@ $trayMenu.Add_Opening({
 })
 [void]$trayMenu.Items.Add('-')
 $exitItem = $trayMenu.Items.Add('Kilépés')
-$exitItem.Add_Click({ $script:reallyExit = $true; $window.Close() })
+$exitItem.Add_Click({
+    $script:reallyExit = $true
+    $script:trayIcon.Visible = $false
+    $script:trayIcon.Dispose()
+    $window.Close()
+})
 $script:trayIcon.ContextMenuStrip = $trayMenu
-$script:trayIcon.Add_DoubleClick({ $window.Show(); $window.WindowState = 'Normal'; $window.Activate() })
+$script:trayIcon.Add_DoubleClick({ Show-SoundLiftMainWindow })
+# Re-register after the complete context menu is attached. This also makes the
+# icon appear reliably when Explorer was still starting during app launch.
+$script:trayIcon.Visible = $false
+$script:trayIcon.Visible = $true
 # A minimalizálás normál Windows-módon működik: az app látható marad a tálcán.
 # Csak az X gomb rejti a tálcaikon mellé, ahonnan dupla kattintással visszahozható.
 $window.Add_StateChanged({
@@ -2820,7 +2847,15 @@ $window.Add_StateChanged({
 })
 $window.Add_Closing({
     param($sender, $eventArgs)
-    if (-not $script:reallyExit) { $eventArgs.Cancel = $true; $window.Hide() }
+    if (-not $script:reallyExit) {
+        $eventArgs.Cancel = $true
+        $window.Hide()
+        $script:trayIcon.Visible = $true
+        if (-not $script:trayHintShown -and -not $script:doNotDisturb) {
+            $script:trayHintShown = $true
+            $script:trayIcon.ShowBalloonTip(2200, 'A SoundLift tovább fut', 'Dupla kattintással bármikor visszanyithatod.', [Windows.Forms.ToolTipIcon]::Info)
+        }
+    }
 })
 $window.Add_Closed({
     $presenceTimer.Stop()
@@ -2828,7 +2863,6 @@ $window.Add_Closed({
     if($script:discordPresencePipe){[void](Set-SoundLiftDiscordPresence '');Disconnect-SoundLiftDiscordPresence}
     for ($i = 0; $i -lt 7; $i++) { [void][AudioAppNative]::UnregisterHotKey($script:windowHandle, 101 + $i) }
     if ($script:windowSource) { $script:windowSource.RemoveHook($script:hotKeyHook) }
-    $script:trayIcon.Visible = $false; $script:trayIcon.Dispose()
 })
 
 Update-Labels

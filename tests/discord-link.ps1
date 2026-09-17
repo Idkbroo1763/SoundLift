@@ -29,7 +29,7 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '1.3.26'")) { throw 'Application version was not updated to 1.3.26' }
+if (-not $source.Contains("`$script:appVersion = '1.3.27'")) { throw 'Application version was not updated to 1.3.27' }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
     if (-not $source.Contains("function $requiredFeature")) { throw "Missing required SoundLift feature: $requiredFeature" }
 }
@@ -75,6 +75,17 @@ foreach ($requiredProfileMixerFeature in @(
 )) {
     if (-not $source.Contains($requiredProfileMixerFeature)) { throw "Missing V1.3.25 profile order or app volume behavior: $requiredProfileMixerFeature" }
 }
+foreach ($requiredTrayLifecycleFeature in @(
+    'function Show-SoundLiftMainWindow', '$eventArgs.Cancel = $true', '$window.Hide()',
+    '$script:trayIcon.Visible = $true', '$script:trayIcon.Add_DoubleClick',
+    '$script:trayIcon.ContextMenuStrip = $trayMenu', '$window.Topmost = $true'
+)) {
+    if (-not $source.Contains($requiredTrayLifecycleFeature)) { throw "Missing V1.3.27 tray lifecycle behavior: $requiredTrayLifecycleFeature" }
+}
+$trayCreation=$source.IndexOf('$script:trayIcon = New-Object Windows.Forms.NotifyIcon')
+$trayMenuCreation=$source.IndexOf('$trayMenu = New-Object Windows.Forms.ContextMenuStrip')
+if($trayCreation -lt 0 -or $trayCreation -gt $trayMenuCreation){throw 'NotifyIcon is not created before tray menu initialization'}
+if(([regex]::Matches($source,[regex]::Escape('$script:trayIcon.Dispose()'))).Count -ne 1){throw 'NotifyIcon must be disposed exactly once, by the real Exit action'}
 foreach ($requiredPresenceFeature in @(
  "discordApplicationId = '1547231878577393716'",
  'DiscordPresenceCheck',
@@ -161,7 +172,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='1.3.26'
+ $script:appVersion='1.3.27'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }
