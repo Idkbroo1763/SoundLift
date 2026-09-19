@@ -53,7 +53,7 @@ foreach ($removedVisibleFeature in @(
 )) {
     if ($source.Contains($removedVisibleFeature)) { throw "Obsolete visible feature is still present: $removedVisibleFeature" }
 }
-foreach ($requiredSimplifiedUi in @('Name="ProfileManagerButton"', "`$ProfileManagerButton.Add_Click", "`$trayMenu.Items.Add('Windows hangbeállítások')")) {
+foreach ($requiredSimplifiedUi in @('Name="ProfileManagerButton"', "`$ProfileManagerButton.Add_Click", "`$windowsSoundItem = `$trayMenu.Items.Add", "Start-Process 'ms-settings:sound'")) {
     if (-not $source.Contains($requiredSimplifiedUi)) { throw "Missing simplified UI behavior: $requiredSimplifiedUi" }
 }
 foreach ($requiredWindowsStartupFix in @(
