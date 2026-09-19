@@ -1,5 +1,11 @@
 ﻿# Windows PowerShell / PS2EXE does not automatically load the DPAPI assembly.
 Add-Type -AssemblyName System.Security
+Add-Type -AssemblyName WindowsBase
+Add-Type -AssemblyName PresentationCore
+Add-Type -AssemblyName PresentationFramework
+Add-Type -AssemblyName System.Xaml
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
 
 # PS2EXE alatt a $PSScriptRoot üres lehet. Ilyenkor az EXE saját mappáját
 # használjuk minden alkalmazáshoz tartozó fájl és parancsikon alapjaként.
@@ -14,7 +20,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.4.0'
+$script:appVersion = '1.4.1'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -187,7 +193,7 @@ trap {
     $crashEvent = if ($script:startupCompleted) { 'unhandled_runtime_error' } else { 'startup_crash' }
     Write-SoundLiftLog -Category crash -EventName $crashEvent -Severity critical -ErrorRecord $_
     if (-not $script:startupCompleted) { Write-SoundLiftLog -Category startup -EventName 'initialization_failed' -Severity critical -ErrorRecord $_ }
-    Send-SoundLiftPendingLogs
+    [void](Send-SoundLiftPendingLogs)
     break
 }
 Add-Type -TypeDefinition @"
@@ -647,13 +653,13 @@ function Get-ApoConfigDirectory {
 # Authenticate before creating controls, tray actions, timers or hotkeys.
 if (-not (Confirm-DiscordAccountLink)) {
     Write-SoundLiftLog -Category startup -EventName 'initialization_failed' -Severity warning -Data @{stage='discord_link_gate'}
-    Send-SoundLiftPendingLogs
+    [void](Send-SoundLiftPendingLogs)
     return
 }
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.4.0" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
+        Title="SoundLift V1.4.1" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -813,7 +819,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.4.0" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.4.1" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="#171719" CornerRadius="13" Padding="16,11" BorderBrush="#303035" BorderThickness="1">
         <StackPanel>
@@ -900,7 +906,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.4.0" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.4.1" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="#94A3B8" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="#94A3B8" FontSize="11" Margin="4,5,0,4"/>
@@ -1073,7 +1079,7 @@ $window.Dispatcher.Add_UnhandledException({
             message=$eventArgs.Exception.Message
             script_stack=$eventArgs.Exception.StackTrace
         }
-        Send-SoundLiftPendingLogs
+        [void](Send-SoundLiftPendingLogs)
         [System.Windows.MessageBox]::Show("A SoundLift váratlan hibát észlelt, ezért biztonságosan bezárul.`nA részletes napló itt található:`n$script:logRoot", 'SoundLift – hiba', 'OK', 'Error') | Out-Null
     } catch { }
     $eventArgs.Handled = $true
@@ -1090,7 +1096,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.4.0'
+$script:trayIcon.Text = 'SoundLift V1.4.1'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -1834,7 +1840,7 @@ function Restore-SoundLiftPreviousVersion {
         $command = "Start-Sleep -Seconds 2; `$actual=(Get-FileHash -LiteralPath '$($state.path.Replace("'", "''"))' -Algorithm SHA256).Hash.ToLowerInvariant(); if (`$actual -ne '$($state.sha256)') { exit 2 }; Copy-Item -LiteralPath '$($state.path.Replace("'", "''"))' -Destination '$($targetPath.Replace("'", "''"))' -Force; Start-Process -FilePath '$($targetPath.Replace("'", "''"))'"
         $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
         Write-SoundLiftLog -Category update -EventName 'version_changed' -Data @{ old_version=$script:appVersion; new_version=$state.version; result='rollback_started' }
-        Send-SoundLiftPendingLogs
+        [void](Send-SoundLiftPendingLogs)
         Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile','-NonInteractive','-WindowStyle','Hidden','-EncodedCommand',$encoded -ErrorAction Stop
         $script:reallyExit=$true; $window.Close()
     } catch { [System.Windows.MessageBox]::Show("A visszaállítás nem indítható el:`n$($_.Exception.Message)", 'SoundLift – Visszaállítás', 'OK', 'Error') | Out-Null }
@@ -2003,7 +2009,7 @@ function Install-SoundLiftUpdate([object]$release, [version]$latestVersion, [Win
         $pendingState = @{ from_version=$script:appVersion; target_version=[string]$latestVersion; started_utc=[DateTime]::UtcNow.ToString('o') }
         [IO.File]::WriteAllText($updateStatePath, ($pendingState | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
         Write-SoundLiftLog -Category update -EventName 'download_page_opened' -Data @{ old_version=$script:appVersion; new_version=$latestVersion; result='automatic_installer_started' }
-        Send-SoundLiftPendingLogs
+        [void](Send-SoundLiftPendingLogs)
         Start-Process -FilePath $installerPath -ArgumentList '/SILENT','/SUPPRESSMSGBOXES','/NORESTART','/CLOSEAPPLICATIONS' -ErrorAction Stop
         return $true
     } catch {
@@ -3089,7 +3095,7 @@ $window.Add_ContentRendered({
     try {
         if (-not (Confirm-SoundLiftLicense)) {
             Write-SoundLiftLog -Category startup -EventName 'initialization_failed' -Severity warning -Data @{ stage='license_gate' }
-            Send-SoundLiftPendingLogs
+            [void](Send-SoundLiftPendingLogs)
             $script:reallyExit = $true; $window.Close(); return
         }
         Update-DeveloperControls
@@ -3100,7 +3106,7 @@ $window.Add_ContentRendered({
     } catch {
         Write-SoundLiftLog -Category startup -EventName 'initialization_failed' -Severity critical -ErrorRecord $_
         Write-SoundLiftLog -Category crash -EventName 'startup_crash' -Severity critical -ErrorRecord $_
-        Send-SoundLiftPendingLogs
+        [void](Send-SoundLiftPendingLogs)
         [System.Windows.MessageBox]::Show("A SoundLift indítása közben hiba történt.`nA részletes napló itt található:`n$script:logRoot", 'SoundLift – indítási hiba', 'OK', 'Error') | Out-Null
         $script:reallyExit = $true; $window.Close()
     }
@@ -3111,6 +3117,6 @@ try {
     $eventName = if ($script:startupCompleted) { 'unhandled_runtime_error' } else { 'startup_crash' }
     Write-SoundLiftLog -Category crash -EventName $eventName -Severity critical -ErrorRecord $_
     if (-not $script:startupCompleted) { Write-SoundLiftLog -Category startup -EventName 'initialization_failed' -Severity critical -ErrorRecord $_ }
-    Send-SoundLiftPendingLogs
+    [void](Send-SoundLiftPendingLogs)
     [System.Windows.MessageBox]::Show("A SoundLift váratlan hibával leállt.`nA jelentés helyileg el lett mentve:`n$script:logRoot", 'SoundLift – hiba', 'OK', 'Error') | Out-Null
 }
