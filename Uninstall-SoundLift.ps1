@@ -23,6 +23,8 @@ foreach ($apoDirectory in $apoDirectories) {
 
 $startupShortcut = Join-Path ([Environment]::GetFolderPath('Startup')) 'SoundLift.lnk'
 if (Test-Path -LiteralPath $startupShortcut) { Remove-Item -LiteralPath $startupShortcut -Force }
+$startupTaskName = 'SoundLift – automatikus indítás'
+try { Unregister-ScheduledTask -TaskName $startupTaskName -Confirm:$false -ErrorAction SilentlyContinue } catch { }
 
 foreach ($localData in @((Join-Path $env:APPDATA 'SoundLift'), (Join-Path $env:LOCALAPPDATA 'SoundLift'))) {
     if (Test-Path -LiteralPath $localData) { Remove-Item -LiteralPath $localData -Recurse -Force }
