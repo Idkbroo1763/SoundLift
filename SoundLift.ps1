@@ -1,4 +1,4 @@
-# Windows PowerShell / PS2EXE does not automatically load the DPAPI assembly.
+﻿# Windows PowerShell / PS2EXE does not automatically load the DPAPI assembly.
 Add-Type -AssemblyName System.Security
 
 # PS2EXE alatt a $PSScriptRoot üres lehet. Ilyenkor az EXE saját mappáját
