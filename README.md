@@ -1,4 +1,4 @@
-# SoundLift V1.4.6
+# SoundLift V1.4.7
 
 Modern Windows-hangvezérlő profilokkal, basszuskiemeléssel, tízsávos
 equalizerrel és akár 300%-os hangerő-erősítéssel.
@@ -21,7 +21,6 @@ Windows 10/11 rendszerhang-erősítő és basszusvezérlő az Equalizer APO-hoz.
 - FiveM-re hangolt Játék profil tisztább beszéddel és részletekkel
 - Discord- és Film-profil
 - 10 sávos, -12 és +12 dB között állítható equalizer
-- FiveM, Spotify és Discord automatikus profilfelismerés
 - opcionális azonnali alkalmazás
 - torzításveszély-jelző és automatikus headroom-védelem
 - hangosabb, használatra kész gyári presetek kiegyensúlyozott headroom-védelemmel
@@ -32,7 +31,7 @@ Windows 10/11 rendszerhang-erősítő és basszusvezérlő az Equalizer APO-hoz.
 - R6, FiveM RP és FiveM PvP profil
 - kiegyensúlyozott játékprofilok: testes hangzás, enyhén kiemelt lépések és részletek
 - sajat profil mentese es betoltese
-- JSON profil importalas es exportalas
+- egységes Profilkezelés menü mentéshez, betöltéshez, importáláshoz és exportáláshoz
 - elozo alkalmazott hang visszavonasa
 - teljes effekt-kikapcsolas egy gombbal
 - beepitett 60 Hz-es basszusteszt
@@ -57,7 +56,6 @@ Windows 10/11 rendszerhang-erősítő és basszusvezérlő az Equalizer APO-hoz.
 - a Discord-fiókhoz kapcsolt támogatási azonosító a gyorsabb hibakereséshez
 - egyetlen univerzális telepítő ingyenes, vásárlói és fejlesztői módhoz
 - alkalmazáson belüli licencaktiválás, amely a frissítések után is megmarad
-- kizárólag developer licenccel elérhető, ellenőrzött verzió-visszaállítás
 - élő frissítési folyamatjelző letöltési százalékkal és telepítési állapottal
 - frissítés utáni automatikus verzióellenőrzés és siker-visszajelzés
 - egygombos Equalizer APO Include-javítás biztonsági mentéssel
@@ -75,7 +73,6 @@ Windows 10/11 rendszerhang-erősítő és basszusvezérlő az Equalizer APO-hoz.
 - backendből kiosztott, licencenként eltérő egyedi funkciók egyetlen közös buildben
 - Tulajdonosi tesztmód más licencek jogosultságainak biztonságos szimulálásához
 - Discord-fiók és licenctulajdonos szerveroldali egyezésellenőrzése
-- opcionális Discord-állapotmegjelenítés az aktuális Spotify-számmal és aktív SoundLift-profillal
 
 Az egyedi funkciók kiosztása és az Owner mód leírása: `licensing/FEATURE-FLAGS.md`.
 
