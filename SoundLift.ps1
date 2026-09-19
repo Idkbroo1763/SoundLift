@@ -1,6 +1,3 @@
-﻿$ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
-Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 # Windows PowerShell / PS2EXE does not automatically load the DPAPI assembly.
 Add-Type -AssemblyName System.Security
 
@@ -17,7 +14,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.3.27'
+$script:appVersion = '1.4.0'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -30,22 +27,27 @@ $script:onboardingCompleted = $false
 $script:discordApplicationId = '1547231878577393716'
 $script:discordPresencePipe = $null
 $script:lastDiscordPresenceSignature = ''
+$script:sessionStartedUtc = [DateTime]::UtcNow
+$script:statistics = $null
+$script:lastClipStatisticUtc = [DateTime]::MinValue
+$script:profileOverlayEnabled = $true
+$script:nightModeEnabled = $false
 # A kiadott alkalmazás univerzális: ingyenes módban indul, és ugyanabban az
 # EXE-ben aktiválható customer vagy developer licenc.
-$script:licenseMode = 'free'
+$script:licenseMode = 'universal'
 $script:currentLicenseType = 'free'
 $script:isOwner = $false
 $script:licenseFeatures = @{}
 $script:simulatedLicenseLabel = ''
-$script:licenseApiUrl = ''
-$script:licenseProductId = ''
-$script:licenseAnonKey = ''
+$script:licenseApiUrl = 'https://uvilqzgbgirdoryavaqp.supabase.co/functions/v1/verify-license'
+$script:licenseProductId = 'soundlift-custom'
+$script:licenseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2aWxxemdiZ2lyZG9yeWF2YXFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4OTY1MzUsImV4cCI6MjEwNDQ3MjUzNX0.6qFhCs5onFuH1uOvlk8C6V4P_fOnNRPxzWXmfdnvCcc'
 # A build-szkriptek kizárólag a publikus naplófogadó végpontot és a Supabase
 # anon kulcsot építhetik be. Discord webhook, bot token és service-role kulcs
 # soha nem kerülhet a kliensbe.
-$script:logApiUrl = ''
-$script:logAnonKey = ''
-$script:discordLinkRequired = $false
+$script:logApiUrl = 'https://uvilqzgbgirdoryavaqp.supabase.co/functions/v1/log-events'
+$script:logAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2aWxxemdiZ2lyZG9yeWF2YXFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4OTY1MzUsImV4cCI6MjEwNDQ3MjUzNX0.6qFhCs5onFuH1uOvlk8C6V4P_fOnNRPxzWXmfdnvCcc'
+$script:discordLinkRequired = $true
 $script:discordLinkGraceHours = 720
 $script:loggerInitialized = $false
 $script:startupCompleted = $false
@@ -223,6 +225,23 @@ public static class AudioAppNative {
         int QueryHardwareSupport(out int hardwareSupportMask);
     }
 
+    [ComImport, InterfaceType(ComInterfaceType.InterfaceIsIUnknown), Guid("5CDF2C82-841E-4546-9722-0CF74078229A")]
+    interface IAudioEndpointVolume {
+        int RegisterControlChangeNotify(IntPtr notify);
+        int UnregisterControlChangeNotify(IntPtr notify);
+        int GetChannelCount(out uint channelCount);
+        int SetMasterVolumeLevel(float levelDb, ref Guid eventContext);
+        int SetMasterVolumeLevelScalar(float level, ref Guid eventContext);
+        int GetMasterVolumeLevel(out float levelDb);
+        int GetMasterVolumeLevelScalar(out float level);
+        int SetChannelVolumeLevel(uint channel, float levelDb, ref Guid eventContext);
+        int SetChannelVolumeLevelScalar(uint channel, float level, ref Guid eventContext);
+        int GetChannelVolumeLevel(uint channel, out float levelDb);
+        int GetChannelVolumeLevelScalar(uint channel, out float level);
+        int SetMute([MarshalAs(UnmanagedType.Bool)] bool mute, ref Guid eventContext);
+        int GetMute(out bool mute);
+    }
+
     [ComImport, InterfaceType(ComInterfaceType.InterfaceIsIUnknown), Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99")]
     interface IPropertyStore {
         int GetCount(out uint count);
@@ -277,6 +296,46 @@ public static class AudioAppNative {
             if (device != null) Marshal.ReleaseComObject(device);
             if (enumerator != null) Marshal.ReleaseComObject(enumerator);
         }
+    }
+
+    public static string GetDefaultInputName() {
+        IMMDeviceEnumerator enumerator = null; IMMDevice device = null; IPropertyStore store = null;
+        try {
+            enumerator = (IMMDeviceEnumerator)(new MMDeviceEnumeratorComObject());
+            if (enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, ERole.eCommunications, out device) != 0) return "Ismeretlen mikrofon";
+            if (device.OpenPropertyStore(0, out store) != 0) return "Ismeretlen mikrofon";
+            var key = new PROPERTYKEY { fmtid = new Guid("A45C254E-DF1C-4EFD-8020-67D146A850E0"), pid = 14 };
+            PROPVARIANT value;
+            if (store.GetValue(ref key, out value) != 0 || value.pointerValue == IntPtr.Zero) return "Ismeretlen mikrofon";
+            return Marshal.PtrToStringUni(value.pointerValue) ?? "Ismeretlen mikrofon";
+        } catch { return "Ismeretlen mikrofon"; }
+        finally {
+            if (store != null) Marshal.ReleaseComObject(store);
+            if (device != null) Marshal.ReleaseComObject(device);
+            if (enumerator != null) Marshal.ReleaseComObject(enumerator);
+        }
+    }
+
+    static IAudioEndpointVolume GetDefaultInputVolume(out IMMDeviceEnumerator enumerator, out IMMDevice device) {
+        enumerator = (IMMDeviceEnumerator)(new MMDeviceEnumeratorComObject());
+        if (enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, ERole.eCommunications, out device) != 0) throw new InvalidOperationException("Nincs alapértelmezett mikrofon.");
+        Guid iid = typeof(IAudioEndpointVolume).GUID; IntPtr instance;
+        if (device.Activate(ref iid, 23, IntPtr.Zero, out instance) != 0 || instance == IntPtr.Zero) throw new InvalidOperationException("A mikrofon hangereje nem érhető el.");
+        var volume = (IAudioEndpointVolume)Marshal.GetObjectForIUnknown(instance); Marshal.Release(instance); return volume;
+    }
+
+    public static float GetDefaultInputVolumePercent() {
+        IMMDeviceEnumerator enumerator = null; IMMDevice device = null; IAudioEndpointVolume volume = null;
+        try { volume = GetDefaultInputVolume(out enumerator, out device); float level; return volume.GetMasterVolumeLevelScalar(out level) == 0 ? Math.Max(0, Math.Min(100, level * 100)) : 0; }
+        catch { return 0; }
+        finally { if (volume != null) Marshal.ReleaseComObject(volume); if (device != null) Marshal.ReleaseComObject(device); if (enumerator != null) Marshal.ReleaseComObject(enumerator); }
+    }
+
+    public static bool SetDefaultInputVolumePercent(float percent) {
+        IMMDeviceEnumerator enumerator = null; IMMDevice device = null; IAudioEndpointVolume volume = null;
+        try { volume = GetDefaultInputVolume(out enumerator, out device); Guid context = Guid.Empty; return volume.SetMasterVolumeLevelScalar(Math.Max(0, Math.Min(1, percent / 100f)), ref context) == 0; }
+        catch { return false; }
+        finally { if (volume != null) Marshal.ReleaseComObject(volume); if (device != null) Marshal.ReleaseComObject(device); if (enumerator != null) Marshal.ReleaseComObject(enumerator); }
     }
 }
 "@
@@ -594,7 +653,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.3.27" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
+        Title="SoundLift V1.4.0" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -754,7 +813,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.3.27" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.4.0" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="#171719" CornerRadius="13" Padding="16,11" BorderBrush="#303035" BorderThickness="1">
         <StackPanel>
@@ -841,7 +900,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.3.27" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.4.0" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="#94A3B8" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="#94A3B8" FontSize="11" Margin="4,5,0,4"/>
@@ -919,7 +978,9 @@ $xaml = @'
                   <CheckBox Name="InstantCheck" Content="Módosítások azonnali alkalmazása"/>
                   <CheckBox Name="StartupCheck" Content="Automatikus indítás a Windowssal"/>
                   <CheckBox Name="DoNotDisturbCheck" Content="Ne zavarjanak mód" ToolTip="Játék közben elrejti a nem fontos felugró értesítéseket."/>
-                  <CheckBox Name="DiscordPresenceCheck" Content="Discord zeneállapot" ToolTip="Az aktuális Spotify-számot helyben megjeleníti Discord Rich Presence-ként. A zeneadat nem kerül a SoundLift szerverére."/>
+                  <CheckBox Name="NightModeCheck" Content="Éjszakai mód" ToolTip="Kiegyensúlyozottabb, halk esti profil erős kiugrások nélkül."/>
+                  <CheckBox Name="OverlayCheck" Content="Profilváltási overlay" IsChecked="True" ToolTip="Profilváltáskor rövid jelzés jelenik meg a képernyő jobb felső sarkában."/>
+                  <CheckBox Name="DiscordPresenceCheck" Content="Discord Rich Presence" ToolTip="Megjeleníti Discordon, hogy a SoundLift fut, melyik profil aktív, és Spotify esetén a zenét is."/>
                 </WrapPanel>
               </StackPanel>
               <Border Grid.Column="1" Background="#12291F" CornerRadius="9" Padding="12,7" VerticalAlignment="Center">
@@ -964,6 +1025,7 @@ $xaml = @'
                     <Button Name="TestButton" Content="◉  Basszus tesztelése (60 Hz)" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
                     <Button Name="DeviceButton" Content="▣  Hangeszközök beállítása" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
                     <Button Name="AppVolumeButton" Content="▥  Alkalmazásonkénti hangerő" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
+                    <Button Name="MicrophoneButton" Content="◉  Mikrofonjavítás" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
                     <Button Name="DiagnosticsButton" Content="✓  Rendszer ellenőrzése" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
                     <Button Name="RepairApoButton" Content="⟳  APO-kapcsolat javítása" Style="{StaticResource UtilityButton}" Margin="0"/>
                   </StackPanel>
@@ -976,6 +1038,8 @@ $xaml = @'
                     <Button Name="UpdateButton" Content="↻  Frissítés keresése" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
                     <Button Name="ChangelogButton" Content="≡  Frissítési előzmények" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
                     <Button Name="HotkeyButton" Content="⌨  Billentyűparancsok" Style="{StaticResource UtilityButton}" Margin="0,0,0,8" ToolTip="A globális profilváltó és gyors némító billentyűk szerkesztése."/>
+                    <Button Name="StatisticsButton" Content="▤  Statisztikák" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
+                    <Button Name="DeveloperConsoleButton" Content="⌘  Fejlesztői konzol" Style="{StaticResource UtilityButton}" Margin="0,0,0,8" Visibility="Collapsed"/>
                     <Button Name="OwnerModeButton" Content="⚙  Owner tesztmód" Style="{StaticResource UtilityButton}" Margin="0,0,0,8" Visibility="Collapsed"/>
                     <Button Name="RollbackButton" Content="↶  Korábbi verzió visszaállítása" Style="{StaticResource UtilityButton}" Margin="0"/>
                   </StackPanel>
@@ -1026,9 +1090,9 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.3.27'
+$script:trayIcon.Text = 'SoundLift V1.4.0'
 $script:trayIcon.Visible = $true
-$names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
+$names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
 $VolumeSlider.ToolTip = 'A teljes hangerő erősítése 0 és 300% között.'
 $BassSlider.ToolTip = 'A mélyhangok kiemelése. Nagy értéknél használd a torzításvédelmet.'
@@ -1113,10 +1177,10 @@ function Set-AppTheme([string]$themeName) {
     foreach ($label in $script:eqValueLabels) { $label.Foreground = $window.Resources['AccentTextBrush'] }
     foreach ($label in $script:eqBandLabels) { $label.Foreground = $window.Resources['MutedTextBrush'] }
     $window.Foreground = $window.Resources['PrimaryTextBrush']
-    foreach ($control in @($MusicButton,$GameButton,$CombatButton,$R6Button,$DiscordButton,$MovieButton,$HeavyButton,$ResetButton,$ExtraBassProButton,$VoiceBoostButton,$CustomPresetXButton,$ProfileOrderButton,$CopySupportIdButton,$LicenseButton,$AboutButton,$PrivacyButton,$SaveButton,$LoadButton,$ExportButton,$ImportButton,$UndoButton,$TestButton,$DeviceButton,$AppVolumeButton,$DiagnosticsButton,$RepairApoButton,$ReportProblemButton,$UpdateButton,$RollbackButton,$OwnerModeButton,$ChangelogButton,$HotkeyButton)) {
+    foreach ($control in @($MusicButton,$GameButton,$CombatButton,$R6Button,$DiscordButton,$MovieButton,$HeavyButton,$ResetButton,$ExtraBassProButton,$VoiceBoostButton,$CustomPresetXButton,$ProfileOrderButton,$CopySupportIdButton,$LicenseButton,$AboutButton,$PrivacyButton,$SaveButton,$LoadButton,$ExportButton,$ImportButton,$UndoButton,$TestButton,$DeviceButton,$AppVolumeButton,$MicrophoneButton,$DiagnosticsButton,$RepairApoButton,$ReportProblemButton,$UpdateButton,$RollbackButton,$OwnerModeButton,$ChangelogButton,$HotkeyButton,$StatisticsButton,$DeveloperConsoleButton)) {
         if ($control) { $control.Foreground = $window.Resources['PrimaryTextBrush'] }
     }
-    foreach ($checkBox in @($SafetyCheck,$AutoProfileCheck,$InstantCheck,$StartupCheck,$DoNotDisturbCheck)) { if ($checkBox) { $checkBox.Foreground = $window.Resources['SecondaryTextBrush'] } }
+    foreach ($checkBox in @($SafetyCheck,$AutoProfileCheck,$InstantCheck,$StartupCheck,$DoNotDisturbCheck,$NightModeCheck,$OverlayCheck,$DiscordPresenceCheck)) { if ($checkBox) { $checkBox.Foreground = $window.Resources['SecondaryTextBrush'] } }
     $ThemeCombo.Foreground = $window.Resources['PrimaryTextBrush']
     $VersionText.Foreground = $window.Resources['MutedTextBrush']; $SupportIdText.Foreground = $window.Resources['MutedTextBrush']; $LicenseStatusText.Foreground = $window.Resources['MutedTextBrush']
     $ApplyButton.Foreground = $window.Resources['AccentContrastBrush']
@@ -1139,6 +1203,44 @@ function Set-EqValues([double[]]$values) {
     for ($i = 0; $i -lt $script:eqSliders.Count; $i++) { $script:eqSliders[$i].Value = $values[$i] }
 }
 
+function Get-SoundLiftProfileDisplayName([string]$profileId) {
+    $result = switch ($profileId) {
+        'Music' { 'Zene' }
+        'FiveM RP' { 'FiveM RP' }
+        'FiveM Combat' { 'FiveM PvP' }
+        'R6' { 'Rainbow Six Siege' }
+        'Movie' { 'Film' }
+        'Heavy' { 'Erőteljes basszus' }
+        'Custom' { 'Egyéni' }
+        default { if ([string]::IsNullOrWhiteSpace($profileId)) { 'Egyéni' } else { $profileId } }
+    }
+    return [string]$result
+}
+
+function Show-ProfileOverlay([string]$profileName) {
+    if (-not $script:profileOverlayEnabled -or $script:doNotDisturb) { return }
+    try {
+        $overlay = [Windows.Window]::new()
+        $overlay.Width=330; $overlay.Height=92; $overlay.WindowStyle='None'; $overlay.ResizeMode='NoResize'; $overlay.ShowInTaskbar=$false
+        $overlay.Topmost=$true; $overlay.AllowsTransparency=$true; $overlay.Background=[Windows.Media.Brushes]::Transparent
+        $work=[Windows.SystemParameters]::WorkArea; $overlay.Left=$work.Right-$overlay.Width-20; $overlay.Top=$work.Top+20
+        $card=[Windows.Controls.Border]::new(); $card.Background='#EE111113'; $card.BorderBrush=$window.Resources['AccentTextBrush']; $card.BorderThickness=[Windows.Thickness]::new(1); $card.CornerRadius=[Windows.CornerRadius]::new(14); $card.Padding=[Windows.Thickness]::new(18,13,18,13)
+        $panel=[Windows.Controls.StackPanel]::new(); $title=[Windows.Controls.TextBlock]::new(); $title.Text='SOUNDLIFT PROFIL'; $title.FontSize=10; $title.FontWeight='Bold'; $title.Foreground=$window.Resources['AccentTextBrush']
+        $name=[Windows.Controls.TextBlock]::new(); $name.Text=$profileName; $name.FontSize=20; $name.FontWeight='SemiBold'; $name.Foreground='#F8FAFC'; $name.Margin=[Windows.Thickness]::new(0,3,0,0)
+        [void]$panel.Children.Add($title); [void]$panel.Children.Add($name); $card.Child=$panel; $overlay.Content=$card
+        $timer=[Windows.Threading.DispatcherTimer]::new(); $timer.Interval=[TimeSpan]::FromMilliseconds(1700); $timer.Add_Tick({$timer.Stop();$overlay.Close()}.GetNewClosure())
+        $overlay.Add_ContentRendered({$timer.Start()}.GetNewClosure()); $overlay.Show()
+    } catch { }
+}
+
+function Add-ProfileStatistic([string]$profileId) {
+    if (-not $script:statistics) { return }
+    $script:statistics.profileSwitches = [int64]$script:statistics.profileSwitches + 1
+    if (-not $script:statistics.profiles) { $script:statistics | Add-Member -NotePropertyName profiles -NotePropertyValue ([PSCustomObject]@{}) -Force }
+    $property=$script:statistics.profiles.PSObject.Properties[$profileId]
+    if ($property) { $property.Value=[int64]$property.Value+1 } else { $script:statistics.profiles | Add-Member -NotePropertyName $profileId -NotePropertyValue ([int64]1) }
+}
+
 function Update-Labels {
     $VolumeValue.Text = "$([int]$VolumeSlider.Value)%"
     $BassValue.Text = "$([int]$BassSlider.Value) dB"
@@ -1156,12 +1258,10 @@ function Update-Labels {
 
 function Set-Profile([int]$volume, [int]$bass, [int]$frequency, [bool]$safe = $true) {
     $VolumeSlider.Value = $volume; $BassSlider.Value = $bass; $FrequencySlider.Value = $frequency
-    $displayName = switch ($script:activeProfile) {
-        'Music' { 'Zene' } 'FiveM RP' { 'FiveM RP' } 'FiveM Combat' { 'FiveM PvP' }
-        'R6' { 'Rainbow Six Siege' } 'Movie' { 'Film' } 'Heavy' { 'Erőteljes basszus' }
-        'Custom' { 'Egyéni' } default { [string]$script:activeProfile }
-    }
+    $displayName = Get-SoundLiftProfileDisplayName $script:activeProfile
     $SafetyCheck.IsChecked = $safe; $ActiveProfileText.Text = "Aktív profil: $displayName"; Update-Labels
+    Add-ProfileStatistic $script:activeProfile
+    Show-ProfileOverlay $displayName
 }
 
 $VolumeSlider.Add_ValueChanged({ Update-Labels })
@@ -1355,11 +1455,13 @@ function Invoke-ApplyButton {
 
 function Get-AppState {
     return [PSCustomObject]@{
-        version = 9; profile = $script:activeProfile; theme = $script:themeName
+        version = 10; profile = $script:activeProfile; theme = $script:themeName
         onboardingCompleted = [bool]$script:onboardingCompleted
         volume = [int]$VolumeSlider.Value; bass = [int]$BassSlider.Value; frequency = [int]$FrequencySlider.Value
         safety = [bool]$SafetyCheck.IsChecked; autoProfile = [bool]$AutoProfileCheck.IsChecked; instant = [bool]$InstantCheck.IsChecked
         doNotDisturb = [bool]$DoNotDisturbCheck.IsChecked
+        nightMode = [bool]$NightModeCheck.IsChecked
+        profileOverlay = [bool]$OverlayCheck.IsChecked
         discordPresence = [bool]$DiscordPresenceCheck.IsChecked
         profileOrder = @($script:profileOrder)
         hiddenProfiles = @($script:hiddenProfiles)
@@ -1376,6 +1478,7 @@ function Set-AppState($state) {
     if ($null -ne $state.autoProfile) { $AutoProfileCheck.IsChecked = [bool]$state.autoProfile }
     if ($null -ne $state.instant) { $InstantCheck.IsChecked = [bool]$state.instant }
     if ($null -ne $state.doNotDisturb) { $DoNotDisturbCheck.IsChecked = [bool]$state.doNotDisturb; $script:doNotDisturb = [bool]$state.doNotDisturb }
+    if ($null -ne $state.profileOverlay) { $OverlayCheck.IsChecked = [bool]$state.profileOverlay; $script:profileOverlayEnabled = [bool]$state.profileOverlay }
     if ($null -ne $state.discordPresence) { $DiscordPresenceCheck.IsChecked = [bool]$state.discordPresence }
     if ($state.profileOrder) { $script:profileOrder=@($state.profileOrder | ForEach-Object {[string]$_}) }
     if ($state.hiddenProfiles) { $script:hiddenProfiles=@($state.hiddenProfiles | ForEach-Object {[string]$_}) }
@@ -1410,6 +1513,26 @@ $settingsPath = Join-Path $appDataDirectory 'settings.json'
 $customProfilePath = Join-Path $appDataDirectory 'custom-profile.json'
 $onboardingMarkerPath = Join-Path $appDataDirectory 'first-run-completed.txt'
 $updateStatePath = Join-Path $appDataDirectory 'pending-update.json'
+$statisticsPath = Join-Path $appDataDirectory 'statistics.json'
+$microphoneSettingsPath = Join-Path $appDataDirectory 'microphone-settings.json'
+
+function New-SoundLiftStatistics {
+    return [PSCustomObject]@{ totalSeconds=[int64]0; launches=[int64]0; profileSwitches=[int64]0; clippingWarnings=[int64]0; profiles=[PSCustomObject]@{}; lastSavedUtc=[DateTime]::UtcNow.ToString('o') }
+}
+try {
+    $script:statistics = if (Test-Path $statisticsPath) { Get-Content -LiteralPath $statisticsPath -Raw | ConvertFrom-Json } else { New-SoundLiftStatistics }
+} catch { $script:statistics = New-SoundLiftStatistics }
+foreach($required in @('totalSeconds','launches','profileSwitches','clippingWarnings')) { if(-not $script:statistics.PSObject.Properties[$required]){$script:statistics|Add-Member -NotePropertyName $required -NotePropertyValue ([int64]0)} }
+if(-not $script:statistics.profiles){$script:statistics|Add-Member -NotePropertyName profiles -NotePropertyValue ([PSCustomObject]@{}) -Force}
+$script:statistics.launches=[int64]$script:statistics.launches+1
+
+function Save-SoundLiftStatistics {
+    if(-not $script:statistics){return}
+    $elapsed=[Math]::Max(0,([DateTime]::UtcNow-$script:sessionStartedUtc).TotalSeconds)
+    $script:statistics.totalSeconds=[int64]$script:statistics.totalSeconds+[int64]$elapsed
+    $script:sessionStartedUtc=[DateTime]::UtcNow; $script:statistics.lastSavedUtc=[DateTime]::UtcNow.ToString('o')
+    try{$script:statistics|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $statisticsPath -Encoding UTF8}catch{}
+}
 
 function Get-DiagnosticsReport {
     $lines = New-Object Collections.Generic.List[string]
@@ -1756,6 +1879,45 @@ function Show-OwnerLicenseSimulator {
 $RollbackButton.Visibility = 'Collapsed'; $RollbackButton.IsEnabled = $false
 $RollbackButton.Add_Click({ Restore-SoundLiftPreviousVersion })
 
+function Show-SoundLiftStatistics {
+    Save-SoundLiftStatistics
+    $total=[TimeSpan]::FromSeconds([double]$script:statistics.totalSeconds)
+    $usage=if($total.TotalHours-ge 1){'{0:N1} óra' -f $total.TotalHours}else{'{0} perc' -f [Math]::Round($total.TotalMinutes)}
+    $top='Még nincs adat';$topCount=0
+    foreach($property in $script:statistics.profiles.PSObject.Properties){if([int64]$property.Value-gt $topCount){$topCount=[int64]$property.Value;$top=Get-SoundLiftProfileDisplayName $property.Name}}
+    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Statisztikák';$dialog.Width=540;$dialog.Height=480;$dialog.ResizeMode='NoResize';$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;$dialog.Background='#09090B';$dialog.Foreground='#F8FAFC'
+    $root=[Windows.Controls.StackPanel]::new();$root.Margin=[Windows.Thickness]::new(26);$title=[Windows.Controls.TextBlock]::new();$title.Text='Használati statisztikák';$title.FontSize=24;$title.FontWeight='Bold';$title.Foreground=$window.Resources['AccentTextBrush'];[void]$root.Children.Add($title)
+    $subtitle=[Windows.Controls.TextBlock]::new();$subtitle.Text='Az adatok kizárólag ezen a gépen kerülnek mentésre.';$subtitle.Foreground='#94A3B8';$subtitle.Margin=[Windows.Thickness]::new(0,5,0,18);[void]$root.Children.Add($subtitle)
+    foreach($entry in @(@('Teljes használati idő',$usage),@('Indítások',[string]$script:statistics.launches),@('Profilváltások',[string]$script:statistics.profileSwitches),@('Leggyakoribb profil',"$top ($topCount alkalom)"),@('Clipping figyelmeztetések',[string]$script:statistics.clippingWarnings))){$card=[Windows.Controls.Border]::new();$card.Background='#111113';$card.CornerRadius=[Windows.CornerRadius]::new(10);$card.Padding=[Windows.Thickness]::new(13,9,13,9);$card.Margin=[Windows.Thickness]::new(0,0,0,7);$dock=[Windows.Controls.DockPanel]::new();$label=[Windows.Controls.TextBlock]::new();$label.Text=$entry[0];$label.Foreground='#CBD5E1';$value=[Windows.Controls.TextBlock]::new();$value.Text=$entry[1];$value.Foreground=$window.Resources['AccentTextBrush'];$value.FontWeight='Bold';$value.HorizontalAlignment='Right';[void]$dock.Children.Add($label);[void]$dock.Children.Add($value);$card.Child=$dock;[void]$root.Children.Add($card)}
+    $actions=[Windows.Controls.StackPanel]::new();$actions.Orientation='Horizontal';$actions.HorizontalAlignment='Right';$actions.Margin=[Windows.Thickness]::new(0,14,0,0)
+    $reset=[Windows.Controls.Button]::new();$reset.Content='Statisztikák nullázása';$reset.Style=$window.Resources['UtilityButton'];$reset.Width=180;$reset.Add_Click({if([System.Windows.MessageBox]::Show('Biztosan törlöd a helyi SoundLift-statisztikákat?','SoundLift','YesNo','Question')-eq'Yes'){$script:statistics=New-SoundLiftStatistics;$script:statistics.launches=1;Save-SoundLiftStatistics;$dialog.Close();$StatusText.Text='Statisztikák nullázva'}}.GetNewClosure())
+    $close=[Windows.Controls.Button]::new();$close.Content='Rendben';$close.Style=$window.Resources['PrimaryButton'];$close.Width=110;$close.Add_Click({$dialog.Close()}.GetNewClosure());[void]$actions.Children.Add($reset);[void]$actions.Children.Add($close);[void]$root.Children.Add($actions);$dialog.Content=$root;$dialog.ShowDialog()|Out-Null
+}
+$StatisticsButton.Add_Click({Show-SoundLiftStatistics})
+
+function Show-DeveloperConsole {
+    if($script:currentLicenseType -ne 'developer'){
+        Write-SoundLiftLog -Category developer_access -EventName 'developer_console_denied' -Severity warning
+        [System.Windows.MessageBox]::Show('A Fejlesztői konzol kizárólag érvényes fejlesztői licenccel használható.','SoundLift','OK','Warning')|Out-Null;return
+    }
+    Write-SoundLiftLog -Category developer_access -EventName 'developer_console_opened'
+    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Fejlesztői konzol';$dialog.Width=900;$dialog.Height=650;$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;$dialog.Background='#08090B';$dialog.Foreground='#F8FAFC'
+    $grid=[Windows.Controls.Grid]::new();$grid.Margin=[Windows.Thickness]::new(20);$grid.RowDefinitions.Add([Windows.Controls.RowDefinition]::new());$bottom=[Windows.Controls.RowDefinition]::new();$bottom.Height=[Windows.GridLength]::Auto;$grid.RowDefinitions.Add($bottom)
+    $console=[Windows.Controls.TextBox]::new();$console.IsReadOnly=$true;$console.AcceptsReturn=$true;$console.TextWrapping='NoWrap';$console.VerticalScrollBarVisibility='Auto';$console.HorizontalScrollBarVisibility='Auto';$console.Background='#050505';$console.Foreground='#D1FAE5';$console.FontFamily='Consolas';$console.FontSize=12;$console.Padding=[Windows.Thickness]::new(12)
+    $refresh={
+        $report=Get-DiagnosticsReport;$logs='Nincs helyi napló.'
+        try{$latest=Get-ChildItem -LiteralPath $script:logRoot -Filter 'soundlift-*.ndjson' -File|Sort-Object LastWriteTimeUtc -Descending|Select-Object -First 1;if($latest){$logs=(Get-Content -LiteralPath $latest.FullName -Tail 120)-join"`r`n"}}catch{}
+        $console.Text="SOUNDLIFT FEJLESZTŐI KONZOL`r`nVerzió: $script:appVersion`r`nLicenc: $script:currentLicenseType`r`nProfil: $script:activeProfile`r`n`r`n=== DIAGNOSZTIKA ===`r`n$report`r`n`r`n=== LEGUTÓBBI NAPLÓ ===`r`n$logs";$console.ScrollToEnd()
+    }.GetNewClosure(); &$refresh
+    [Windows.Controls.Grid]::SetRow($console,0);[void]$grid.Children.Add($console)
+    $actions=[Windows.Controls.StackPanel]::new();$actions.Orientation='Horizontal';$actions.HorizontalAlignment='Right';$actions.Margin=[Windows.Thickness]::new(0,12,0,0)
+    $refreshButton=[Windows.Controls.Button]::new();$refreshButton.Content='Frissítés';$refreshButton.Style=$window.Resources['UtilityButton'];$refreshButton.Width=105;$refreshButton.Add_Click({&$refresh}.GetNewClosure())
+    $copy=[Windows.Controls.Button]::new();$copy.Content='Másolás';$copy.Style=$window.Resources['UtilityButton'];$copy.Width=105;$copy.Add_Click({[Windows.Forms.Clipboard]::SetText($console.Text)}.GetNewClosure())
+    $logsButton=[Windows.Controls.Button]::new();$logsButton.Content='Naplómappa';$logsButton.Style=$window.Resources['UtilityButton'];$logsButton.Width=120;$logsButton.Add_Click({if(Test-Path $script:logRoot){Start-Process explorer.exe $script:logRoot}}.GetNewClosure())
+    $close=[Windows.Controls.Button]::new();$close.Content='Bezárás';$close.Style=$window.Resources['PrimaryButton'];$close.Width=105;$close.Add_Click({$dialog.Close()}.GetNewClosure());foreach($button in @($refreshButton,$copy,$logsButton,$close)){[void]$actions.Children.Add($button)};[Windows.Controls.Grid]::SetRow($actions,1);[void]$grid.Children.Add($actions);$dialog.Content=$grid;$dialog.ShowDialog()|Out-Null
+}
+$DeveloperConsoleButton.Add_Click({Show-DeveloperConsole})
+
 function Update-DeveloperControls {
     $displayType = switch ($script:currentLicenseType) { 'developer' { 'fejlesztői' } 'customer' { 'vásárlói' } default { 'ingyenes' } }
     $LicenseStatusText.Text = "Licenc: $displayType"
@@ -1763,9 +1925,12 @@ function Update-DeveloperControls {
     if ($script:currentLicenseType -eq 'developer') {
         $RollbackButton.Visibility = 'Visible'
         $RollbackButton.IsEnabled = $null -ne (Get-SoundLiftRollbackState)
+        $DeveloperConsoleButton.Visibility = 'Visible'
     } else {
         $RollbackButton.Visibility = 'Collapsed'; $RollbackButton.IsEnabled = $false
+        $DeveloperConsoleButton.Visibility = 'Collapsed'; $DeveloperConsoleButton.IsEnabled = $false
     }
+    if($script:currentLicenseType -eq 'developer'){$DeveloperConsoleButton.IsEnabled=$true}
     $OwnerModeButton.Visibility = if($script:isOwner){'Visible'}else{'Collapsed'}
     $ExtraBassProButton.Visibility = if($script:licenseFeatures.ContainsKey('extra_bass_pro')){'Visible'}else{'Collapsed'}
     $VoiceBoostButton.Visibility = if($script:licenseFeatures.ContainsKey('voice_boost')){'Visible'}else{'Collapsed'}
@@ -2031,6 +2196,13 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.4.0 – MIKROFON, ÉJSZAKAI MÓD ÉS FEJLESZTŐI ESZKÖZÖK
+• Új mikrofonpanel hangerőszabályzással, teszttel és driverfüggő javítási opciókkal.
+• Elkészült az Éjszakai mód és a kapcsolható profilváltási overlay.
+• A Discord Rich Presence már zene nélkül is mutatja az aktív SoundLift-profilt.
+• Helyi használati statisztikák készülnek használati idővel, profilváltásokkal és clipping-jelzésekkel.
+• A Fejlesztői konzol kizárólag érvényes developer licenccel látható és nyitható meg.
+
 V1.3.27 – SYSTEM TRAY IKON JAVÍTÁSA
 • A valódi értesítési területi ikon már a SoundLift indulásakor azonnal létrejön.
 • Az X gomb csak elrejti a főablakot; a tray ikon és a gyorsmenü aktív marad.
@@ -2470,12 +2642,15 @@ function Get-SoundLiftSpotifyTrack {
     return $title
 }
 
-function Set-SoundLiftDiscordPresence([string]$track) {
+function Set-SoundLiftDiscordPresence([string]$track, [switch]$Clear) {
     if(-not (Connect-SoundLiftDiscordPresence)){return $false}
     $activity=$null
-    if(-not [string]::IsNullOrWhiteSpace($track)){
-        $profile=if([string]::IsNullOrWhiteSpace($script:activeProfile)){'Egyéni'}else{$script:activeProfile}
-        $activity=@{details=$track;state="with SoundLift • $profile profil";timestamps=@{start=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()}}
+    if(-not $Clear){
+        $profile=Get-SoundLiftProfileDisplayName $script:activeProfile
+        $details=if([string]::IsNullOrWhiteSpace($track)){'SoundLift aktív'}else{$track}
+        $state=if([string]::IsNullOrWhiteSpace($track)){"Aktív profil: $profile"}else{"SoundLift • $profile profil"}
+        $started=[DateTimeOffset]$script:sessionStartedUtc
+        $activity=@{details=$details;state=$state;timestamps=@{start=$started.ToUnixTimeSeconds()}}
     }
     try {
         Write-DiscordPresenceFrame $script:discordPresencePipe 1 @{cmd='SET_ACTIVITY';args=@{pid=[Diagnostics.Process]::GetCurrentProcess().Id;activity=$activity};nonce=[Guid]::NewGuid().ToString()}
@@ -2489,18 +2664,18 @@ $presenceTimer=New-Object Windows.Threading.DispatcherTimer
 $presenceTimer.Interval=[TimeSpan]::FromSeconds(8)
 $presenceTimer.Add_Tick({
     if(-not $DiscordPresenceCheck.IsChecked){
-        if($script:lastDiscordPresenceSignature){[void](Set-SoundLiftDiscordPresence '');Disconnect-SoundLiftDiscordPresence}
+        if($script:lastDiscordPresenceSignature){[void](Set-SoundLiftDiscordPresence '' -Clear);Disconnect-SoundLiftDiscordPresence}
         return
     }
     if(-not (Get-Process Discord -ErrorAction SilentlyContinue)){Disconnect-SoundLiftDiscordPresence;return}
     $track=Get-SoundLiftSpotifyTrack
-    $signature=if($track){"$track|$script:activeProfile"}else{''}
+    $signature=if($track){"$track|$script:activeProfile"}else{"running|$script:activeProfile"}
     if($signature -eq $script:lastDiscordPresenceSignature -and $script:discordPresencePipe -and $script:discordPresencePipe.IsConnected){return}
     if(Set-SoundLiftDiscordPresence $track){$script:lastDiscordPresenceSignature=$signature}
 })
 $DiscordPresenceCheck.Add_Click({
     if($DiscordPresenceCheck.IsChecked){$StatusText.Text='Discord zeneállapot bekapcsolva';$presenceTimer.Stop();$presenceTimer.Start()}
-    else{[void](Set-SoundLiftDiscordPresence '');Disconnect-SoundLiftDiscordPresence;$StatusText.Text='Discord zeneállapot kikapcsolva'}
+    else{[void](Set-SoundLiftDiscordPresence '' -Clear);Disconnect-SoundLiftDiscordPresence;$StatusText.Text='Discord Rich Presence kikapcsolva'}
     try{(Get-AppState)|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $settingsPath -Encoding UTF8}catch{}
 })
 $presenceTimer.Start()
@@ -2560,6 +2735,44 @@ $AppVolumeButton.Add_Click({
     }
 })
 
+function Show-MicrophoneEnhancementWindow {
+    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Mikrofonjavítás';$dialog.Width=560;$dialog.Height=510;$dialog.ResizeMode='NoResize';$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;$dialog.Background='#09090B';$dialog.Foreground='#F8FAFC'
+    $root=[Windows.Controls.StackPanel]::new();$root.Margin=[Windows.Thickness]::new(25)
+    $title=[Windows.Controls.TextBlock]::new();$title.Text='Mikrofonjavítás';$title.FontSize=24;$title.FontWeight='Bold';$title.Foreground=$window.Resources['AccentTextBrush'];[void]$root.Children.Add($title)
+    $device=[Windows.Controls.TextBlock]::new();$device.Text="Aktív mikrofon: $([AudioAppNative]::GetDefaultInputName())";$device.TextWrapping='Wrap';$device.Foreground='#94A3B8';$device.Margin=[Windows.Thickness]::new(0,5,0,20);[void]$root.Children.Add($device)
+    $levelLabel=[Windows.Controls.TextBlock]::new();$levelLabel.Text='Mikrofon hangereje';$levelLabel.FontWeight='SemiBold';[void]$root.Children.Add($levelLabel)
+    $level=[Windows.Controls.Slider]::new();$level.Minimum=0;$level.Maximum=100;$level.TickFrequency=5;$level.IsSnapToTickEnabled=$true;$level.Value=[AudioAppNative]::GetDefaultInputVolumePercent();$level.Margin=[Windows.Thickness]::new(0,6,0,4);[void]$root.Children.Add($level)
+    $levelValue=[Windows.Controls.TextBlock]::new();$levelValue.Text="$([int]$level.Value)%";$levelValue.Foreground=$window.Resources['AccentTextBrush'];$levelValue.FontWeight='Bold';$levelValue.Margin=[Windows.Thickness]::new(0,0,0,16);[void]$root.Children.Add($levelValue);$level.Add_ValueChanged({$levelValue.Text="$([int]$level.Value)%"}.GetNewClosure())
+    $noise=[Windows.Controls.CheckBox]::new();$noise.Content='Zajszűrés kérése a Windows/driver számára';$noise.ToolTip='Az elérhetőség a mikrofon illesztőprogramjától függ.';$noise.Margin=[Windows.Thickness]::new(0,0,0,9);[void]$root.Children.Add($noise)
+    $compressor=[Windows.Controls.CheckBox]::new();$compressor.Content='Beszédkiegyenlítés / kompresszor kérése';$compressor.ToolTip='Az elérhetőség a mikrofon illesztőprogramjától függ.';$compressor.Margin=[Windows.Thickness]::new(0,0,0,14);[void]$root.Children.Add($compressor)
+    if(Test-Path $microphoneSettingsPath){try{$saved=Get-Content $microphoneSettingsPath -Raw|ConvertFrom-Json;$noise.IsChecked=[bool]$saved.noiseSuppression;$compressor.IsChecked=[bool]$saved.compressor}catch{}}
+    $note=[Windows.Controls.TextBlock]::new();$note.Text='A hangerőt a SoundLift közvetlenül beállítja. A zajszűrés és kompresszor csak akkor aktiválható, ha a mikrofon drivere támogatja; ehhez a Windows mikrofontulajdonságait is megnyithatod.';$note.TextWrapping='Wrap';$note.Foreground='#94A3B8';$note.Margin=[Windows.Thickness]::new(0,0,0,16);[void]$root.Children.Add($note)
+    $tools=[Windows.Controls.StackPanel]::new();$tools.Orientation='Horizontal';$tools.HorizontalAlignment='Left'
+    $properties=[Windows.Controls.Button]::new();$properties.Content='Windows mikrofonbeállítások';$properties.Style=$window.Resources['UtilityButton'];$properties.Width=220;$properties.Add_Click({try{Start-Process 'ms-settings:sound'}catch{}}.GetNewClosure())
+    $test=[Windows.Controls.Button]::new();$test.Content='Mikrofon teszt';$test.Style=$window.Resources['UtilityButton'];$test.Width=150;$test.Add_Click({try{Start-Process 'ms-settings:sound'}catch{}}.GetNewClosure());[void]$tools.Children.Add($properties);[void]$tools.Children.Add($test);[void]$root.Children.Add($tools)
+    $actions=[Windows.Controls.StackPanel]::new();$actions.Orientation='Horizontal';$actions.HorizontalAlignment='Right';$actions.Margin=[Windows.Thickness]::new(0,22,0,0)
+    $cancel=[Windows.Controls.Button]::new();$cancel.Content='Mégse';$cancel.Style=$window.Resources['UtilityButton'];$cancel.Width=100;$cancel.Add_Click({$dialog.Close()}.GetNewClosure())
+    $apply=[Windows.Controls.Button]::new();$apply.Content='Alkalmazás';$apply.Style=$window.Resources['PrimaryButton'];$apply.Width=130;$apply.Add_Click({
+        if(-not [AudioAppNative]::SetDefaultInputVolumePercent([single]$level.Value)){[System.Windows.MessageBox]::Show('A mikrofon hangerejét nem sikerült beállítani.','SoundLift','OK','Warning')|Out-Null;return}
+        @{volume=[int]$level.Value;noiseSuppression=[bool]$noise.IsChecked;compressor=[bool]$compressor.IsChecked;device=[AudioAppNative]::GetDefaultInputName()}|ConvertTo-Json|Set-Content -LiteralPath $microphoneSettingsPath -Encoding UTF8
+        $StatusText.Text="Mikrofon hangerő alkalmazva • $([int]$level.Value)%";$dialog.Close()
+    }.GetNewClosure());[void]$actions.Children.Add($cancel);[void]$actions.Children.Add($apply);[void]$root.Children.Add($actions);$dialog.Content=$root;$dialog.ShowDialog()|Out-Null
+}
+$MicrophoneButton.Add_Click({Show-MicrophoneEnhancementWindow})
+
+$NightModeCheck.Add_Click({
+    if($NightModeCheck.IsChecked){
+        $script:nightModeSnapshot=[PSCustomObject]@{profile=$script:activeProfile;volume=[int]$VolumeSlider.Value;bass=[int]$BassSlider.Value;frequency=[int]$FrequencySlider.Value;safety=[bool]$SafetyCheck.IsChecked;eq=@($script:eqSliders|ForEach-Object{[int]$_.Value})}
+        $script:nightModeEnabled=$true;$script:activeProfile='Éjszakai';Set-Profile 110 1 75 $true;Set-EqValues @(-1,0,1,2,2,1,0,-1,-2,-3);$StatusText.Text='Éjszakai mód bekapcsolva • kiegyensúlyozott halk hangzás'
+    } else {
+        $script:nightModeEnabled=$false
+        if($script:nightModeSnapshot){$snapshot=$script:nightModeSnapshot;$script:activeProfile=[string]$snapshot.profile;Set-Profile $snapshot.volume $snapshot.bass $snapshot.frequency $snapshot.safety;Set-EqValues ([double[]]$snapshot.eq)}
+        $StatusText.Text='Éjszakai mód kikapcsolva'
+    }
+    if($InstantCheck.IsChecked){Invoke-ApplyButton}
+})
+$OverlayCheck.Add_Click({$script:profileOverlayEnabled=[bool]$OverlayCheck.IsChecked;$StatusText.Text=if($script:profileOverlayEnabled){'Profilváltási overlay bekapcsolva'}else{'Profilváltási overlay kikapcsolva'}})
+
 # Remember the complete UI state between launches.
 if (Test-Path $settingsPath) {
     try { Set-AppState (Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json) } catch { }
@@ -2567,6 +2780,7 @@ if (Test-Path $settingsPath) {
 if (Test-Path $onboardingMarkerPath) { $script:onboardingCompleted = $true }
 $window.Add_Closing({
     try { (Get-AppState) | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $settingsPath -Encoding UTF8 } catch { }
+    Save-SoundLiftStatistics
 })
 
 # Display the current Windows default output and refresh it automatically.
@@ -2594,6 +2808,7 @@ function Update-LiveAudioMeter {
         if ($peak -ge 98.5) {
             $LiveClipText.Text = 'CLIPPING'; $LiveClipText.Foreground = '#FB7185'
             $LeftPeakMeter.Foreground = '#FB7185'; $RightPeakMeter.Foreground = '#FB7185'
+            if($script:statistics -and ([DateTime]::UtcNow-$script:lastClipStatisticUtc).TotalSeconds -ge 10){$script:statistics.clippingWarnings=[int64]$script:statistics.clippingWarnings+1;$script:lastClipStatisticUtc=[DateTime]::UtcNow}
         } elseif ($peak -ge 85) {
             $LiveClipText.Text = 'MAGAS JELSZINT'; $LiveClipText.Foreground = '#FBBF24'
             $LeftPeakMeter.Foreground = '#FBBF24'; $RightPeakMeter.Foreground = '#FBBF24'
@@ -2860,7 +3075,8 @@ $window.Add_Closing({
 $window.Add_Closed({
     $presenceTimer.Stop()
     $audioMeterTimer.Stop()
-    if($script:discordPresencePipe){[void](Set-SoundLiftDiscordPresence '');Disconnect-SoundLiftDiscordPresence}
+    Save-SoundLiftStatistics
+    if($script:discordPresencePipe){[void](Set-SoundLiftDiscordPresence '' -Clear);Disconnect-SoundLiftDiscordPresence}
     for ($i = 0; $i -lt 7; $i++) { [void][AudioAppNative]::UnregisterHotKey($script:windowHandle, 101 + $i) }
     if ($script:windowSource) { $script:windowSource.RemoveHook($script:hotKeyHook) }
 })
