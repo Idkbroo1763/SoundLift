@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.4.6'
+$script:appVersion = '1.4.7'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -41,7 +41,7 @@ $script:lastDiscordPresenceSignature = ''
 $script:sessionStartedUtc = [DateTime]::UtcNow
 $script:statistics = $null
 $script:lastClipStatisticUtc = [DateTime]::MinValue
-$script:profileOverlayEnabled = $true
+$script:profileOverlayEnabled = $false
 $script:nightModeEnabled = $false
 # A kiadott alkalmazás univerzális: ingyenes módban indul, és ugyanabban az
 # EXE-ben aktiválható customer vagy developer licenc.
@@ -675,7 +675,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.4.6" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
+        Title="SoundLift V1.4.7" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -835,7 +835,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.4.6" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.4.7" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="#171719" CornerRadius="13" Padding="16,11" BorderBrush="#303035" BorderThickness="1">
         <StackPanel>
@@ -922,7 +922,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.4.6" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.4.7" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="#94A3B8" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="#94A3B8" FontSize="11" Margin="4,5,0,4"/>
@@ -996,13 +996,13 @@ $xaml = @'
                 <TextBlock Text="VÉDELEM ÉS AUTOMATIZÁLÁS" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}" Margin="0,0,0,8"/>
                 <WrapPanel>
                   <CheckBox Name="SafetyCheck" Content="Torzításvédelem" IsChecked="True"/>
-                  <CheckBox Name="AutoProfileCheck" Content="Automatikus profilváltás"/>
+                  <CheckBox Name="AutoProfileCheck" Visibility="Collapsed" IsChecked="False"/>
                   <CheckBox Name="InstantCheck" Content="Módosítások azonnali alkalmazása"/>
                   <CheckBox Name="StartupCheck" Content="Automatikus indítás a Windowssal"/>
                   <CheckBox Name="DoNotDisturbCheck" Content="Ne zavarjanak mód" ToolTip="Játék közben elrejti a nem fontos felugró értesítéseket."/>
-                  <CheckBox Name="NightModeCheck" Content="Éjszakai mód" ToolTip="Kiegyensúlyozottabb, halk esti profil erős kiugrások nélkül."/>
-                  <CheckBox Name="OverlayCheck" Content="Profilváltási jelzés" IsChecked="True" ToolTip="Profilváltáskor rövid jelzés jelenik meg a képernyő jobb felső sarkában."/>
-                  <CheckBox Name="DiscordPresenceCheck" Content="Discord-állapot megjelenítése" ToolTip="Megjeleníti Discordon, hogy a SoundLift fut, melyik profil aktív, és Spotify esetén a zenét is."/>
+                  <CheckBox Name="NightModeCheck" Visibility="Collapsed" IsChecked="False"/>
+                  <CheckBox Name="OverlayCheck" Visibility="Collapsed" IsChecked="False"/>
+                  <CheckBox Name="DiscordPresenceCheck" Visibility="Collapsed" IsChecked="False"/>
                 </WrapPanel>
               </StackPanel>
               <Border Grid.Column="1" Background="#12291F" CornerRadius="9" Padding="12,7" VerticalAlignment="Center">
@@ -1033,10 +1033,11 @@ $xaml = @'
                   <StackPanel>
                     <TextBlock Text="PROFILOK" Foreground="{DynamicResource SectionTextBrush}" FontSize="10" FontWeight="Bold" Margin="2,0,0,3"/>
                     <TextBlock Text="Mentés, betöltés és átvitel" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" Margin="2,0,0,10"/>
-                    <Button Name="SaveButton" Content="＋  Egyéni profil mentése" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
-                    <Button Name="LoadButton" Content="↗  Mentett profil betöltése" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
-                    <Button Name="ExportButton" Content="⇧  Profil exportálása" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
-                    <Button Name="ImportButton" Content="⇩  Profil importálása" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
+                    <Button Name="ProfileManagerButton" Content="☰  Profilkezelés" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
+                    <Button Name="SaveButton" Visibility="Collapsed"/>
+                    <Button Name="LoadButton" Visibility="Collapsed"/>
+                    <Button Name="ExportButton" Visibility="Collapsed"/>
+                    <Button Name="ImportButton" Visibility="Collapsed"/>
                     <Button Name="UndoButton" Content="↶  Előző beállítás visszaállítása" Style="{StaticResource UtilityButton}" Margin="0"/>
                   </StackPanel>
                 </Border>
@@ -1060,10 +1061,10 @@ $xaml = @'
                     <Button Name="UpdateButton" Content="↻  Frissítés keresése" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
                     <Button Name="ChangelogButton" Content="≡  Frissítési előzmények" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
                     <Button Name="HotkeyButton" Content="⌨  Billentyűparancsok" Style="{StaticResource UtilityButton}" Margin="0,0,0,8" ToolTip="A globális profilváltó és gyors némító billentyűk szerkesztése."/>
-                    <Button Name="StatisticsButton" Content="▤  Statisztikák" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
+                    <Button Name="StatisticsButton" Visibility="Collapsed"/>
                     <Button Name="DeveloperConsoleButton" Content="⌘  Fejlesztői konzol" Style="{StaticResource UtilityButton}" Margin="0,0,0,8" Visibility="Collapsed"/>
-                    <Button Name="OwnerModeButton" Content="⚙  Tulajdonosi tesztmód" Style="{StaticResource UtilityButton}" Margin="0,0,0,8" Visibility="Collapsed"/>
-                    <Button Name="RollbackButton" Content="↶  Korábbi verzió visszaállítása" Style="{StaticResource UtilityButton}" Margin="0"/>
+                    <Button Name="OwnerModeButton" Visibility="Collapsed"/>
+                    <Button Name="RollbackButton" Visibility="Collapsed"/>
                   </StackPanel>
                 </Border>
               </Grid>
@@ -1112,9 +1113,9 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.4.6'
+$script:trayIcon.Text = 'SoundLift V1.4.7'
 $script:trayIcon.Visible = $true
-$names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
+$names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
 $VolumeSlider.ToolTip = 'A teljes hangerő erősítése 0 és 300% között.'
 $BassSlider.ToolTip = 'A mélyhangok kiemelése. Nagy értéknél használd a torzításvédelmet.'
@@ -1483,11 +1484,11 @@ function Get-AppState {
         version = 10; profile = $script:activeProfile; theme = $script:themeName
         onboardingCompleted = [bool]$script:onboardingCompleted
         volume = [int]$VolumeSlider.Value; bass = [int]$BassSlider.Value; frequency = [int]$FrequencySlider.Value
-        safety = [bool]$SafetyCheck.IsChecked; autoProfile = [bool]$AutoProfileCheck.IsChecked; instant = [bool]$InstantCheck.IsChecked
+        safety = [bool]$SafetyCheck.IsChecked; autoProfile = $false; instant = [bool]$InstantCheck.IsChecked
         doNotDisturb = [bool]$DoNotDisturbCheck.IsChecked
-        nightMode = [bool]$NightModeCheck.IsChecked
-        profileOverlay = [bool]$OverlayCheck.IsChecked
-        discordPresence = [bool]$DiscordPresenceCheck.IsChecked
+        nightMode = $false
+        profileOverlay = $false
+        discordPresence = $false
         profileOrder = @($script:profileOrder)
         hiddenProfiles = @($script:hiddenProfiles)
         hotkeys = @($script:hotKeyBindings | ForEach-Object { [PSCustomObject]@{ modifiers=[int]$_.modifiers; key=[int]$_.key } })
@@ -1500,11 +1501,12 @@ function Set-AppState($state) {
     $script:activeProfile = if ($state.profile) { [string]$state.profile } else { 'Custom' }
     Set-Profile ([int]$state.volume) ([int]$state.bass) ([int]$state.frequency) ([bool]$state.safety)
     if ($state.eq -and $state.eq.Count -eq 10) { Set-EqValues ([double[]]$state.eq) }
-    if ($null -ne $state.autoProfile) { $AutoProfileCheck.IsChecked = [bool]$state.autoProfile }
+    $AutoProfileCheck.IsChecked = $false
     if ($null -ne $state.instant) { $InstantCheck.IsChecked = [bool]$state.instant }
     if ($null -ne $state.doNotDisturb) { $DoNotDisturbCheck.IsChecked = [bool]$state.doNotDisturb; $script:doNotDisturb = [bool]$state.doNotDisturb }
-    if ($null -ne $state.profileOverlay) { $OverlayCheck.IsChecked = [bool]$state.profileOverlay; $script:profileOverlayEnabled = [bool]$state.profileOverlay }
-    if ($null -ne $state.discordPresence) { $DiscordPresenceCheck.IsChecked = [bool]$state.discordPresence }
+    $NightModeCheck.IsChecked = $false
+    $OverlayCheck.IsChecked = $false; $script:profileOverlayEnabled = $false
+    $DiscordPresenceCheck.IsChecked = $false
     if ($state.profileOrder) { $script:profileOrder=@($state.profileOrder | ForEach-Object {[string]$_}) }
     if ($state.hiddenProfiles) { $script:hiddenProfiles=@($state.hiddenProfiles | ForEach-Object {[string]$_}) }
     Apply-ProfileLayout
@@ -1947,16 +1949,10 @@ function Update-DeveloperControls {
     $displayType = switch ($script:currentLicenseType) { 'developer' { 'fejlesztői' } 'customer' { 'vásárlói' } default { 'ingyenes' } }
     $LicenseStatusText.Text = "Licenc: $displayType"
     $LicenseButton.Content = if ($script:currentLicenseType -eq 'free') { '◇  Licenc aktiválása' } else { '◇  Licenc kezelése' }
-    if ($script:currentLicenseType -eq 'developer') {
-        $RollbackButton.Visibility = 'Visible'
-        $RollbackButton.IsEnabled = $null -ne (Get-SoundLiftRollbackState)
-        $DeveloperConsoleButton.Visibility = 'Visible'
-    } else {
-        $RollbackButton.Visibility = 'Collapsed'; $RollbackButton.IsEnabled = $false
-        $DeveloperConsoleButton.Visibility = 'Collapsed'; $DeveloperConsoleButton.IsEnabled = $false
-    }
+    $RollbackButton.Visibility = 'Collapsed'; $RollbackButton.IsEnabled = $false
+    if ($script:currentLicenseType -eq 'developer') { $DeveloperConsoleButton.Visibility = 'Visible' } else { $DeveloperConsoleButton.Visibility = 'Collapsed'; $DeveloperConsoleButton.IsEnabled = $false }
     if($script:currentLicenseType -eq 'developer'){$DeveloperConsoleButton.IsEnabled=$true}
-    $OwnerModeButton.Visibility = if($script:isOwner){'Visible'}else{'Collapsed'}
+    $OwnerModeButton.Visibility = 'Collapsed'
     $ExtraBassProButton.Visibility = if($script:licenseFeatures.ContainsKey('extra_bass_pro')){'Visible'}else{'Collapsed'}
     $VoiceBoostButton.Visibility = if($script:licenseFeatures.ContainsKey('voice_boost')){'Visible'}else{'Collapsed'}
     $CustomPresetXButton.Visibility = if($script:licenseFeatures.ContainsKey('custom_preset_x')){'Visible'}else{'Collapsed'}
@@ -2549,6 +2545,20 @@ $ImportButton.Add_Click({
         }
     }
 })
+$ProfileManagerButton.Add_Click({
+    $menu = [Windows.Controls.ContextMenu]::new()
+    foreach ($entry in @(
+        @('Egyéni profil mentése',$SaveButton),
+        @('Mentett profil betöltése',$LoadButton),
+        @('Profil exportálása',$ExportButton),
+        @('Profil importálása',$ImportButton)
+    )) {
+        $item=[Windows.Controls.MenuItem]::new();$item.Header=$entry[0];$target=$entry[1]
+        $item.Add_Click({$target.RaiseEvent((New-Object Windows.RoutedEventArgs([Windows.Controls.Button]::ClickEvent)))}.GetNewClosure())
+        [void]$menu.Items.Add($item)
+    }
+    $menu.PlacementTarget=$ProfileManagerButton;$menu.Placement='Bottom';$menu.IsOpen=$true
+})
 $UndoButton.Add_Click({
     $apo = Get-ApoConfigDirectory
     if ($apo) {
@@ -2732,7 +2742,7 @@ $DiscordPresenceCheck.Add_Click({
     else{[void](Set-SoundLiftDiscordPresence '' -Clear);Disconnect-SoundLiftDiscordPresence;$StatusText.Text='A Discord-állapot megjelenítése kikapcsolva'}
     try{(Get-AppState)|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $settingsPath -Encoding UTF8}catch{}
 })
-$presenceTimer.Start()
+# A Discord Rich Presence funkció el lett távolítva; az időzítő nem indul el.
 
 # Optional automatic switching: FiveM has priority, followed by Spotify and Discord.
 $script:lastAutoProfile = ''
@@ -2753,7 +2763,7 @@ $autoTimer.Add_Tick({
         if ($script:trayIcon -and -not $script:doNotDisturb) { $script:trayIcon.ShowBalloonTip(1800, 'Profilváltás', "$wanted profil bekapcsolva", [Windows.Forms.ToolTipIcon]::Info) }
     }
 })
-$autoTimer.Start()
+# Az automatikus profilváltás el lett távolítva; az időzítő nem indul el.
 
 # A SoundLift rendszergazdai joggal fut, ezért a Windows a sima Indítópultból
 # nem indítja el megbízhatóan. Bejelentkezéskor egy emelt jogosultságú,
@@ -2818,18 +2828,15 @@ function Show-MicrophoneEnhancementWindow {
     $levelLabel=[Windows.Controls.TextBlock]::new();$levelLabel.Text='Mikrofon hangereje';$levelLabel.FontWeight='SemiBold';[void]$root.Children.Add($levelLabel)
     $level=[Windows.Controls.Slider]::new();$level.Minimum=0;$level.Maximum=100;$level.TickFrequency=5;$level.IsSnapToTickEnabled=$true;$level.Value=[AudioAppNative]::GetDefaultInputVolumePercent();$level.Margin=[Windows.Thickness]::new(0,6,0,4);[void]$root.Children.Add($level)
     $levelValue=[Windows.Controls.TextBlock]::new();$levelValue.Text="$([int]$level.Value)%";$levelValue.Foreground=$window.Resources['AccentTextBrush'];$levelValue.FontWeight='Bold';$levelValue.Margin=[Windows.Thickness]::new(0,0,0,16);[void]$root.Children.Add($levelValue);$level.Add_ValueChanged({$levelValue.Text="$([int]$level.Value)%"}.GetNewClosure())
-    $noise=[Windows.Controls.CheckBox]::new();$noise.Content='Zajszűrés kérése a Windowstól vagy az illesztőprogramtól';$noise.ToolTip='Az elérhetőség a mikrofon illesztőprogramjától függ.';$noise.Foreground='#E2E8F0';$noise.FontSize=13;$noise.Margin=[Windows.Thickness]::new(0,0,0,9);[void]$root.Children.Add($noise)
-    $compressor=[Windows.Controls.CheckBox]::new();$compressor.Content='Beszédkiegyenlítés / kompresszor kérése';$compressor.ToolTip='Az elérhetőség a mikrofon illesztőprogramjától függ.';$compressor.Foreground='#E2E8F0';$compressor.FontSize=13;$compressor.Margin=[Windows.Thickness]::new(0,0,0,14);[void]$root.Children.Add($compressor)
-    if(Test-Path $microphoneSettingsPath){try{$saved=Get-Content $microphoneSettingsPath -Raw|ConvertFrom-Json;$noise.IsChecked=[bool]$saved.noiseSuppression;$compressor.IsChecked=[bool]$saved.compressor}catch{}}
-    $note=[Windows.Controls.TextBlock]::new();$note.Text='A hangerőt a SoundLift közvetlenül beállítja. A zajszűrés és a kompresszor csak akkor kapcsolható be, ha a mikrofon illesztőprogramja támogatja; ehhez a Windows mikrofonbeállításait is megnyithatod.';$note.TextWrapping='Wrap';$note.Foreground='#94A3B8';$note.Margin=[Windows.Thickness]::new(0,0,0,16);[void]$root.Children.Add($note)
+    $note=[Windows.Controls.TextBlock]::new();$note.Text='A SoundLift közvetlenül a Windows alapértelmezett mikrofonjának bemeneti hangerejét állítja.';$note.TextWrapping='Wrap';$note.Foreground='#94A3B8';$note.Margin=[Windows.Thickness]::new(0,0,0,16);[void]$root.Children.Add($note)
     $tools=[Windows.Controls.StackPanel]::new();$tools.Orientation='Horizontal';$tools.HorizontalAlignment='Left'
     $properties=[Windows.Controls.Button]::new();$properties.Content='Windows mikrofonbeállítások';$properties.Style=$window.Resources['UtilityButton'];$properties.Width=220;$properties.Add_Click({try{Start-Process 'ms-settings:sound'}catch{}}.GetNewClosure())
-    $test=[Windows.Controls.Button]::new();$test.Content='Mikrofon teszt';$test.Style=$window.Resources['UtilityButton'];$test.Width=150;$test.Add_Click({try{Start-Process 'ms-settings:sound'}catch{}}.GetNewClosure());[void]$tools.Children.Add($properties);[void]$tools.Children.Add($test);[void]$root.Children.Add($tools)
+    [void]$tools.Children.Add($properties);[void]$root.Children.Add($tools)
     $actions=[Windows.Controls.StackPanel]::new();$actions.Orientation='Horizontal';$actions.HorizontalAlignment='Right';$actions.Margin=[Windows.Thickness]::new(0,22,0,0)
     $cancel=[Windows.Controls.Button]::new();$cancel.Content='Mégse';$cancel.Style=$window.Resources['UtilityButton'];$cancel.Width=100;$cancel.Add_Click({$dialog.Close()}.GetNewClosure())
     $apply=[Windows.Controls.Button]::new();$apply.Content='Alkalmazás';$apply.Style=$window.Resources['PrimaryButton'];$apply.Width=130;$apply.Add_Click({
         if(-not [AudioAppNative]::SetDefaultInputVolumePercent([single]$level.Value)){[System.Windows.MessageBox]::Show('A mikrofon hangerejét nem sikerült beállítani.','SoundLift','OK','Warning')|Out-Null;return}
-        @{volume=[int]$level.Value;noiseSuppression=[bool]$noise.IsChecked;compressor=[bool]$compressor.IsChecked;device=[AudioAppNative]::GetDefaultInputName()}|ConvertTo-Json|Set-Content -LiteralPath $microphoneSettingsPath -Encoding UTF8
+        @{volume=[int]$level.Value;device=[AudioAppNative]::GetDefaultInputName()}|ConvertTo-Json|Set-Content -LiteralPath $microphoneSettingsPath -Encoding UTF8
         $StatusText.Text="Mikrofon hangerő alkalmazva • $([int]$level.Value)%";$dialog.Close()
     }.GetNewClosure());[void]$actions.Children.Add($cancel);[void]$actions.Children.Add($apply);[void]$root.Children.Add($actions);$dialog.Content=$root;$dialog.ShowDialog()|Out-Null
 }
@@ -3091,16 +3098,8 @@ $muteItem = $trayMenu.Items.Add('Gyors némítás')
 $muteItem.Add_Click({ Invoke-QuickMute })
 $bypassItem = $trayMenu.Items.Add('SoundLift-hatások kikapcsolása')
 $bypassItem.Add_Click({ if($script:isBypassed){Disable-SoundLiftBypass}else{Invoke-SoundLiftBypass $false} })
-$deviceMenu = New-Object Windows.Forms.ToolStripMenuItem -ArgumentList 'Hangeszköz váltása'
-$currentDeviceItem = New-Object Windows.Forms.ToolStripMenuItem -ArgumentList 'Aktív: betöltés…'; $currentDeviceItem.Enabled=$false; [void]$deviceMenu.DropDownItems.Add($currentDeviceItem)
-[void]$deviceMenu.DropDownItems.Add('-')
-$windowsSoundItem = $deviceMenu.DropDownItems.Add('Windows hangkimenet választó')
+$windowsSoundItem = $trayMenu.Items.Add('Windows hangbeállítások')
 $windowsSoundItem.Add_Click({ try { Start-Process 'ms-settings:sound' } catch { } })
-$appMixerItem = $deviceMenu.DropDownItems.Add('Alkalmazásonkénti hangerő')
-$appMixerItem.Add_Click({ try { Start-Process 'ms-settings:apps-volume' } catch { } })
-$apoDeviceItem = $deviceMenu.DropDownItems.Add('Equalizer APO eszközbeállítás')
-$apoDeviceItem.Add_Click({ $DeviceButton.RaiseEvent((New-Object Windows.RoutedEventArgs([Windows.Controls.Button]::ClickEvent))) })
-[void]$trayMenu.Items.Add($deviceMenu)
 $dndItem = New-Object Windows.Forms.ToolStripMenuItem -ArgumentList 'Ne zavarjanak mód'; $dndItem.CheckOnClick=$true; $dndItem.Checked=$script:doNotDisturb
 $dndItem.Add_CheckedChanged({$script:doNotDisturb=$dndItem.Checked; $DoNotDisturbCheck.IsChecked=$script:doNotDisturb}.GetNewClosure()); [void]$trayMenu.Items.Add($dndItem)
 $trayMenu.Add_Opening({
@@ -3109,7 +3108,6 @@ $trayMenu.Add_Opening({
     $muteItem.Text=if($script:isQuickMuted){'Hang visszakapcsolása'}else{'Gyors némítás'}
     $bypassItem.Text=if($script:isBypassed){'SoundLift-hatások visszakapcsolása'}else{'SoundLift-hatások kikapcsolása'}
     $bypassItem.Checked=$script:isBypassed
-    $currentDeviceItem.Text="Aktív: $([AudioAppNative]::GetDefaultOutputName())"
     $profileNames=@{'Music'='Zene';'FiveM RP'='FiveM RP';'FiveM Combat'='FiveM PvP';'R6'='Rainbow Six Siege';'Discord'='Discord';'Movie'='Film'}
     $activeTrayName=$profileNames[[string]$script:activeProfile]
     foreach($profileItem in $script:trayProfileItems){$profileItem.Checked=($profileItem.Text -eq $activeTrayName)}

@@ -29,7 +29,7 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '1.4.6'")) { throw 'Application version was not updated to 1.4.6' }
+if (-not $source.Contains("`$script:appVersion = '1.4.7'")) { throw 'Application version was not updated to 1.4.7' }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
     if (-not $source.Contains("function $requiredFeature")) { throw "Missing required SoundLift feature: $requiredFeature" }
 }
@@ -43,6 +43,18 @@ foreach ($requiredGameAndMicrophoneFix in @(
     'GetMasterVolumeLevelScalar(out confirmed)'
 )) {
     if (-not $source.Contains($requiredGameAndMicrophoneFix)) { throw "Missing game focus or microphone volume fix: $requiredGameAndMicrophoneFix" }
+}
+foreach ($removedVisibleFeature in @(
+    'Content="Automatikus profilváltás"', 'Content="Éjszakai mód"',
+    'Content="Profilváltási jelzés"', 'Content="Discord-állapot megjelenítése"',
+    'Content="▤  Statisztikák"', 'Content="⚙  Tulajdonosi tesztmód"',
+    'Content="↶  Korábbi verzió visszaállítása"', "Content='Mikrofon teszt'",
+    "Content='Zajszűrés kérése", "Content='Beszédkiegyenlítés"
+)) {
+    if ($source.Contains($removedVisibleFeature)) { throw "Obsolete visible feature is still present: $removedVisibleFeature" }
+}
+foreach ($requiredSimplifiedUi in @('Name="ProfileManagerButton"', "`$ProfileManagerButton.Add_Click", "`$trayMenu.Items.Add('Windows hangbeállítások')")) {
+    if (-not $source.Contains($requiredSimplifiedUi)) { throw "Missing simplified UI behavior: $requiredSimplifiedUi" }
 }
 foreach ($requiredWindowsStartupFix in @(
     'function Test-SoundLiftStartupTask', 'function Enable-SoundLiftStartupTask',
@@ -101,19 +113,8 @@ $trayCreation=$source.IndexOf('$script:trayIcon = New-Object Windows.Forms.Notif
 $trayMenuCreation=$source.IndexOf('$trayMenu = New-Object Windows.Forms.ContextMenuStrip')
 if($trayCreation -lt 0 -or $trayCreation -gt $trayMenuCreation){throw 'NotifyIcon is not created before tray menu initialization'}
 if(([regex]::Matches($source,[regex]::Escape('$script:trayIcon.Dispose()'))).Count -ne 1){throw 'NotifyIcon must be disposed exactly once, by the real Exit action'}
-foreach ($requiredPresenceFeature in @(
- "discordApplicationId = '1547231878577393716'",
- 'DiscordPresenceCheck',
- 'function Connect-SoundLiftDiscordPresence',
- 'function Get-SoundLiftSpotifyTrack',
- "cmd='SET_ACTIVITY'",
- 'PipeDirection]::InOut',
- 'discordPresence = [bool]$DiscordPresenceCheck.IsChecked',
- 'lastDiscordPresenceSignature'
-)) {
-    if (-not $source.Contains($requiredPresenceFeature)) { throw "Missing V1.3.21 Discord presence behavior: $requiredPresenceFeature" }
-}
-if ($source -match 'Write-SoundLiftLog[^\r\n]*\$track') { throw 'Spotify track title must not be written to SoundLift logs' }
+if ([regex]::IsMatch($source, '(?m)^\$presenceTimer\.Start\(\)\s*$')) { throw 'Removed Discord presence timer must not start' }
+if ([regex]::IsMatch($source, '(?m)^\$autoTimer\.Start\(\)\s*$')) { throw 'Removed automatic profile timer must not start' }
 if ($source.Contains('Check-AppUpdate -Silent')) { throw 'Blocking startup update check is still enabled' }
 $installerSource = Get-Content "$PSScriptRoot/../installer.iss" -Raw
 $uninstallerSource = Get-Content "$PSScriptRoot/../Uninstall-SoundLift.ps1" -Raw
@@ -191,7 +192,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='1.4.6'
+ $script:appVersion='1.4.7'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }
