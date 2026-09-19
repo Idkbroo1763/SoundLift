@@ -29,12 +29,19 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '1.4.1'")) { throw 'Application version was not updated to 1.4.1' }
+if (-not $source.Contains("`$script:appVersion = '1.4.2'")) { throw 'Application version was not updated to 1.4.2' }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
     if (-not $source.Contains("function $requiredFeature")) { throw "Missing required SoundLift feature: $requiredFeature" }
 }
 foreach ($requiredStartupFix in @('function Start-AsyncAppUpdateCheck', 'DownloadStringAsync', 'if (Test-DiscordLinkOfflineGrace) { return $true }')) {
     if (-not $source.Contains($requiredStartupFix)) { throw "Missing responsive startup behavior: $requiredStartupFix" }
+}
+foreach ($requiredWindowsStartupFix in @(
+    'function Test-SoundLiftStartupTask', 'function Enable-SoundLiftStartupTask',
+    'New-ScheduledTaskTrigger -AtLogOn', 'New-ScheduledTaskPrincipal', '-RunLevel Highest',
+    'Register-ScheduledTask -TaskName $startupTaskName', 'Unregister-ScheduledTask -TaskName $startupTaskName'
+)) {
+    if (-not $source.Contains($requiredWindowsStartupFix)) { throw "Missing reliable Windows startup behavior: $requiredWindowsStartupFix" }
 }
 foreach ($requiredControlFeature in @(
  'function Invoke-QuickMute', 'function Register-SoundLiftHotKeys', 'function Show-HotkeyEditor',
@@ -105,7 +112,7 @@ $uninstallerSource = Get-Content "$PSScriptRoot/../Uninstall-SoundLift.ps1" -Raw
 foreach ($requiredCleanupMarker in @('[UninstallRun]', 'Uninstall-SoundLift.ps1')) {
     if (-not $installerSource.Contains($requiredCleanupMarker)) { throw "Missing clean uninstall integration: $requiredCleanupMarker" }
 }
-foreach ($requiredCleanupBehavior in @('Remove-SoundLiftInclude', "Join-Path `$env:APPDATA 'SoundLift'", "Join-Path `$env:LOCALAPPDATA 'SoundLift'", "'SoundLift.lnk'")) {
+foreach ($requiredCleanupBehavior in @('Remove-SoundLiftInclude', "Join-Path `$env:APPDATA 'SoundLift'", "Join-Path `$env:LOCALAPPDATA 'SoundLift'", "'SoundLift.lnk'", 'Unregister-ScheduledTask')) {
     if (-not $uninstallerSource.Contains($requiredCleanupBehavior)) { throw "Missing clean uninstall behavior: $requiredCleanupBehavior" }
 }
 if (-not $source.Contains("`$script:discordLinkGraceHours = 720")) { throw 'Offline grace period is not 30 days' }
@@ -172,7 +179,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='1.4.1'
+ $script:appVersion='1.4.2'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }
