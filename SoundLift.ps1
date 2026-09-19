@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.4.5'
+$script:appVersion = '1.4.6'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -313,7 +313,7 @@ public static class AudioAppNative {
         IMMDeviceEnumerator enumerator = null; IMMDevice device = null; IPropertyStore store = null;
         try {
             enumerator = (IMMDeviceEnumerator)(new MMDeviceEnumeratorComObject());
-            if (enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, ERole.eCommunications, out device) != 0) return "Ismeretlen mikrofon";
+            if (enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, ERole.eConsole, out device) != 0) return "Ismeretlen mikrofon";
             if (device.OpenPropertyStore(0, out store) != 0) return "Ismeretlen mikrofon";
             var key = new PROPERTYKEY { fmtid = new Guid("A45C254E-DF1C-4EFD-8020-67D146A850E0"), pid = 14 };
             PROPVARIANT value;
@@ -327,9 +327,9 @@ public static class AudioAppNative {
         }
     }
 
-    static IAudioEndpointVolume GetDefaultInputVolume(out IMMDeviceEnumerator enumerator, out IMMDevice device) {
+    static IAudioEndpointVolume GetDefaultInputVolume(ERole role, out IMMDeviceEnumerator enumerator, out IMMDevice device) {
         enumerator = (IMMDeviceEnumerator)(new MMDeviceEnumeratorComObject());
-        if (enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, ERole.eCommunications, out device) != 0) throw new InvalidOperationException("Nincs alapértelmezett mikrofon.");
+        if (enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, role, out device) != 0) throw new InvalidOperationException("Nincs alapértelmezett mikrofon.");
         Guid iid = typeof(IAudioEndpointVolume).GUID; IntPtr instance;
         if (device.Activate(ref iid, 23, IntPtr.Zero, out instance) != 0 || instance == IntPtr.Zero) throw new InvalidOperationException("A mikrofon hangereje nem érhető el.");
         var volume = (IAudioEndpointVolume)Marshal.GetObjectForIUnknown(instance); Marshal.Release(instance); return volume;
@@ -337,16 +337,27 @@ public static class AudioAppNative {
 
     public static float GetDefaultInputVolumePercent() {
         IMMDeviceEnumerator enumerator = null; IMMDevice device = null; IAudioEndpointVolume volume = null;
-        try { volume = GetDefaultInputVolume(out enumerator, out device); float level; return volume.GetMasterVolumeLevelScalar(out level) == 0 ? Math.Max(0, Math.Min(100, level * 100)) : 0; }
+        try { volume = GetDefaultInputVolume(ERole.eConsole, out enumerator, out device); float level; return volume.GetMasterVolumeLevelScalar(out level) == 0 ? Math.Max(0, Math.Min(100, level * 100)) : 0; }
         catch { return 0; }
         finally { if (volume != null) Marshal.ReleaseComObject(volume); if (device != null) Marshal.ReleaseComObject(device); if (enumerator != null) Marshal.ReleaseComObject(enumerator); }
     }
 
     public static bool SetDefaultInputVolumePercent(float percent) {
-        IMMDeviceEnumerator enumerator = null; IMMDevice device = null; IAudioEndpointVolume volume = null;
-        try { volume = GetDefaultInputVolume(out enumerator, out device); Guid context = Guid.Empty; return volume.SetMasterVolumeLevelScalar(Math.Max(0, Math.Min(1, percent / 100f)), ref context) == 0; }
-        catch { return false; }
-        finally { if (volume != null) Marshal.ReleaseComObject(volume); if (device != null) Marshal.ReleaseComObject(device); if (enumerator != null) Marshal.ReleaseComObject(enumerator); }
+        float target = Math.Max(0, Math.Min(1, percent / 100f));
+        bool applied = false;
+        foreach (ERole role in new[] { ERole.eConsole, ERole.eMultimedia, ERole.eCommunications }) {
+            IMMDeviceEnumerator enumerator = null; IMMDevice device = null; IAudioEndpointVolume volume = null;
+            try {
+                volume = GetDefaultInputVolume(role, out enumerator, out device);
+                Guid context = Guid.Empty;
+                if (volume.SetMasterVolumeLevelScalar(target, ref context) == 0) {
+                    float confirmed;
+                    if (volume.GetMasterVolumeLevelScalar(out confirmed) == 0 && Math.Abs(confirmed - target) <= 0.02f) applied = true;
+                }
+            } catch { }
+            finally { if (volume != null) Marshal.ReleaseComObject(volume); if (device != null) Marshal.ReleaseComObject(device); if (enumerator != null) Marshal.ReleaseComObject(enumerator); }
+        }
+        return applied;
     }
 }
 "@
@@ -664,7 +675,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.4.5" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
+        Title="SoundLift V1.4.6" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -824,7 +835,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.4.5" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.4.6" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="#171719" CornerRadius="13" Padding="16,11" BorderBrush="#303035" BorderThickness="1">
         <StackPanel>
@@ -911,7 +922,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.4.5" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.4.6" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="#94A3B8" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="#94A3B8" FontSize="11" Margin="4,5,0,4"/>
@@ -1101,7 +1112,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.4.5'
+$script:trayIcon.Text = 'SoundLift V1.4.6'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -1236,7 +1247,7 @@ function Show-ProfileOverlay([string]$profileName) {
     try {
         $overlay = [Windows.Window]::new()
         $overlay.Width=330; $overlay.Height=92; $overlay.WindowStyle='None'; $overlay.ResizeMode='NoResize'; $overlay.ShowInTaskbar=$false
-        $overlay.Topmost=$true; $overlay.AllowsTransparency=$true; $overlay.Background=[Windows.Media.Brushes]::Transparent
+        $overlay.Topmost=$true; $overlay.ShowActivated=$false; $overlay.Focusable=$false; $overlay.IsHitTestVisible=$false; $overlay.AllowsTransparency=$true; $overlay.Background=[Windows.Media.Brushes]::Transparent
         $work=[Windows.SystemParameters]::WorkArea; $overlay.Left=$work.Right-$overlay.Width-20; $overlay.Top=$work.Top+20
         $card=[Windows.Controls.Border]::new(); $card.Background='#EE111113'; $card.BorderBrush=$window.Resources['AccentTextBrush']; $card.BorderThickness=[Windows.Thickness]::new(1); $card.CornerRadius=[Windows.CornerRadius]::new(14); $card.Padding=[Windows.Thickness]::new(18,13,18,13)
         $panel=[Windows.Controls.StackPanel]::new(); $title=[Windows.Controls.TextBlock]::new(); $title.Text='SOUNDLIFT PROFIL'; $title.FontSize=10; $title.FontWeight='Bold'; $title.Foreground=$window.Resources['AccentTextBrush']
@@ -2109,8 +2120,9 @@ function Start-AsyncAppUpdateCheck {
                 $latestVersion = [version](([string]$release.tag_name).Trim().TrimStart([char[]]'vV'))
                 if ($latestVersion -gt [version]$script:appVersion) {
                     Write-SoundLiftLog -Category update -EventName 'update_available' -Data @{ old_version=$script:appVersion; new_version=$latestVersion }
-                    if ($script:doNotDisturb) {
+                    if ($script:doNotDisturb -or -not $window.IsActive -or -not $window.IsVisible) {
                         $StatusText.Text = "Új frissítés érhető el: V$latestVersion"
+                        if (-not $script:doNotDisturb) { $script:trayIcon.ShowBalloonTip(3500, 'SoundLift-frissítés érhető el', "Új verzió: V$latestVersion. Nyisd meg a SoundLiftet a telepítéshez.", [Windows.Forms.ToolTipIcon]::Info) }
                     } else {
                         Show-AppUpdateDialog $release $latestVersion
                     }
