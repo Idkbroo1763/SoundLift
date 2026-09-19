@@ -41,7 +41,7 @@ if (-not $source.Contains("`$script:discordLinkRequired = `$true")) { throw 'Dis
 # A minimális, dokumentált paraméterkészletet használjuk. Ez elkerüli, hogy a
 # GitHub runner PowerShell-verziója a metaadat-kapcsolókat LCID-ként értelmezze.
 try {
-    Invoke-PS2EXE $temporarySource $outputExe -IconFile $iconFile -NoConsole -RequireAdmin -STA -Verbose
+    Invoke-PS2EXE $temporarySource $outputExe -IconFile $iconFile -NoConsole -NoOutput -NoError -RequireAdmin -STA -Verbose
     if (-not (Test-Path $outputExe)) { throw 'Az EXE fordítása nem sikerült.' }
     Copy-Item -LiteralPath $iconFile -Destination (Join-Path $outputDirectory 'SoundLift.ico') -Force
     Write-Host "Elkészült: $outputExe"
