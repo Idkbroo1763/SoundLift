@@ -100,7 +100,7 @@ foreach ($requiredCustomHotkeyFeature in @(
 )) {
     if (-not $source.Contains($requiredCustomHotkeyFeature)) { throw "Missing V1.3.20 custom hotkey behavior: $requiredCustomHotkeyFeature" }
 }
-foreach($requiredHotkeySaveFix in @('$cancel.Width=112; $cancel.Height=42','$save.Width=112; $save.Height=42','$save.IsDefault=$true','$dialog.DialogResult=$true','A billentyűparancsok mentése nem sikerült.')){
+foreach($requiredHotkeySaveFix in @('$cancel.Width=112; $cancel.Height=42','$save.Width=112; $save.Height=42','$save.IsDefault=$true','$dialog.DialogResult=$true','$saveError=$_.Exception.Message')){
     if(-not $source.Contains($requiredHotkeySaveFix)){throw "Missing reliable hotkey save behavior: $requiredHotkeySaveFix"}
 }
 if ($source.Contains('Minden parancs Ctrl+Alt + a kiválasztott szám')) { throw 'Legacy number-only hotkey editor is still present' }
