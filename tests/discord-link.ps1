@@ -29,7 +29,7 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '1.6.0'")) { throw 'Application version was not updated to 1.6.0' }
+if (-not $source.Contains("`$script:appVersion = '1.6.1'")) { throw 'Application version was not updated to 1.6.1' }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
     if (-not $source.Contains("function $requiredFeature")) { throw "Missing required SoundLift feature: $requiredFeature" }
 }
@@ -99,6 +99,9 @@ foreach ($requiredCustomHotkeyFeature in @(
  'if ([int]$binding.key -eq 0) { continue }'
 )) {
     if (-not $source.Contains($requiredCustomHotkeyFeature)) { throw "Missing V1.3.20 custom hotkey behavior: $requiredCustomHotkeyFeature" }
+}
+foreach($requiredHotkeySaveFix in @('$cancel.Width=112; $cancel.Height=42','$save.Width=112; $save.Height=42','$save.IsDefault=$true','$dialog.DialogResult=$true','A billentyűparancsok mentése nem sikerült.')){
+    if(-not $source.Contains($requiredHotkeySaveFix)){throw "Missing reliable hotkey save behavior: $requiredHotkeySaveFix"}
 }
 if ($source.Contains('Minden parancs Ctrl+Alt + a kiválasztott szám')) { throw 'Legacy number-only hotkey editor is still present' }
 if ($source.Contains('Önmagában csak az F1–F24 funkcióbillentyűk használhatók.')) { throw 'Single-key shortcuts are still limited to function keys' }
@@ -209,7 +212,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='1.6.0'
+ $script:appVersion='1.6.1'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }
