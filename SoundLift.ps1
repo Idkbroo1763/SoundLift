@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.6.3'
+$script:appVersion = '1.6.4'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -802,7 +802,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.6.3" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
+        Title="SoundLift V1.6.4" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -972,7 +972,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.6.3" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.6.4" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="15" Padding="17,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
         <StackPanel>
@@ -1059,7 +1059,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.6.3" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.6.4" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,5,0,4"/>
@@ -1250,7 +1250,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.6.3'
+$script:trayIcon.Text = 'SoundLift V1.6.4'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -2412,6 +2412,9 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.6.4 – LETISZTULT MIKROFONABLAK
+• A hosszú Shadow-figyelmeztetés kikerült a mikrofonablakból, így a felület ismét rövid és átlátható.
+
 V1.6.3 – MIKROFONHANGERŐ JAVÍTÁSA
 • Normál mikrofonoknál a master hangerő mellett minden bemeneti csatorna és a némítási állapot is frissül.
 • A Shadow Virtual Audio eszközt a SoundLift felismeri, és nem jelez többé félrevezetően sikeres fizikai mikrofonállítást.
@@ -3036,7 +3039,7 @@ function Show-MicrophoneEnhancementWindow {
     $levelLabel=[Windows.Controls.TextBlock]::new();$levelLabel.Text='Mikrofon hangereje';$levelLabel.FontWeight='SemiBold';[void]$root.Children.Add($levelLabel)
     $level=[Windows.Controls.Slider]::new();$level.Minimum=0;$level.Maximum=100;$level.TickFrequency=5;$level.IsSnapToTickEnabled=$true;$level.Value=[AudioAppNative]::GetDefaultInputVolumePercent();$level.Margin=[Windows.Thickness]::new(0,6,0,4);[void]$root.Children.Add($level)
     $levelValue=[Windows.Controls.TextBlock]::new();$levelValue.Text="$([int]$level.Value)%";$levelValue.Foreground=$window.Resources['AccentTextBrush'];$levelValue.FontWeight='Bold';$levelValue.Margin=[Windows.Thickness]::new(0,0,0,16);[void]$root.Children.Add($levelValue);$level.Add_ValueChanged({$levelValue.Text="$([int]$level.Value)%"}.GetNewClosure())
-    $note=[Windows.Controls.TextBlock]::new();$note.Text=if($isShadowMicrophone){'A Shadow csak egy virtuális mikrofont ad át. A valódi mikrofon hangerejét azon a saját gépen kell beállítani, amelyről a Shadowt használod; a Shadowon belüli csúszka nem tudja a fizikai mikrofon erősítését módosítani.'}else{'A SoundLift a Windows alapértelmezett mikrofonjának master- és csatornahangerejét is beállítja.'};$note.TextWrapping='Wrap';$note.Foreground=if($isShadowMicrophone){'#FBBF24'}else{'#94A3B8'};$note.Margin=[Windows.Thickness]::new(0,0,0,16);[void]$root.Children.Add($note)
+    $note=[Windows.Controls.TextBlock]::new();$note.Text='A SoundLift a Windows alapértelmezett mikrofonjának bemeneti hangerejét állítja.';$note.TextWrapping='Wrap';$note.Foreground='#94A3B8';$note.Margin=[Windows.Thickness]::new(0,0,0,16);[void]$root.Children.Add($note)
     $tools=[Windows.Controls.StackPanel]::new();$tools.Orientation='Horizontal';$tools.HorizontalAlignment='Left'
     $properties=[Windows.Controls.Button]::new();$properties.Content='Windows mikrofonbeállítások';$properties.Style=$window.Resources['UtilityButton'];$properties.Width=220;$properties.Add_Click({try{Start-Process 'ms-settings:sound'}catch{}}.GetNewClosure())
     [void]$tools.Children.Add($properties);[void]$root.Children.Add($tools)
