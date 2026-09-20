@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.5.0'
+$script:appVersion = '1.5.1'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -629,7 +629,8 @@ function Invoke-LicenseApi([string]$licenseKey, [string]$action = 'verify', [str
         $headers['apikey'] = $script:licenseAnonKey
         $headers['Authorization'] = "Bearer $($script:licenseAnonKey)"
     }
-    $requestData = @{ license_key=$licenseKey.Trim(); product_id=$script:licenseProductId; device_id=Get-LicenseDeviceId; installation_id=$script:installationId; installation_proof=(Get-InstallationProof); action=$action }
+    $buildChannel = if ($script:licenseMode -eq 'custom') { 'customer' } else { 'public' }
+    $requestData = @{ license_key=$licenseKey.Trim(); product_id=$script:licenseProductId; device_id=Get-LicenseDeviceId; installation_id=$script:installationId; installation_proof=(Get-InstallationProof); action=$action; app_version=$script:appVersion; build_channel=$buildChannel }
     if (-not [string]::IsNullOrWhiteSpace($simulationLicenseId)) { $requestData.simulation_license_id=$simulationLicenseId }
     $body = $requestData | ConvertTo-Json -Compress
     try {
@@ -726,11 +727,9 @@ function Confirm-SoundLiftLicense {
         $response = Invoke-LicenseApi $key
         if ($response.allowed -eq $true) {
             Set-LicenseResponse $response -Persist -licenseKey $key
-            $eventName = if (-not $PromptForKey -and $saved -and $saved.key) { 'validation_succeeded' } else { 'activation_succeeded' }
-            Write-SoundLiftLog -Category license -EventName $eventName -Data @{ license_type=$response.license_type; code=$response.code }
-            if ([string]$response.license_type -eq 'developer') {
-                Write-SoundLiftLog -Category developer_access -EventName 'developer_license_used' -Severity warning -Data @{ authorization_id=$response.authorization_id; code=$response.code }
-            }
+            # A sikeres online licencellenőrzést a megbízható backend naplózza
+            # részletesen és naponta deduplikálva. A kliens nem küld róla
+            # második eseményt, így a Supabase- és Discord-használat alacsony marad.
             return $true
         }
         $failureCode = ConvertTo-SoundLiftSafeText $response.code 60
@@ -748,7 +747,10 @@ function Confirm-SoundLiftLicense {
                 if (([DateTime]::UtcNow - [DateTime]::Parse([string]$saved.lastSuccessUtc).ToUniversalTime()).TotalHours -le 72) {
                     $script:currentLicenseType = if ($saved.licenseType) { [string]$saved.licenseType } else { 'customer' }
                     $script:isOwner = ($saved.isOwner -eq $true); Set-LicenseFeatures @($saved.features)
-                    Write-SoundLiftLog -Category license -EventName 'offline_grace_used' -Severity warning -Data @{ grace_hours=72 }
+                    $offlineFeatures = @($saved.features | ForEach-Object { [string]$_.feature_key } | Where-Object { $_ }) -join ', '
+                    $offlineVariant = if ($script:currentLicenseType -eq 'developer') { 'fejlesztői' } elseif ($offlineFeatures) { 'egyedi' } else { 'normál' }
+                    $offlineBuildChannel = if ($script:licenseMode -eq 'custom') { 'customer' } else { 'public' }
+                    Write-SoundLiftLog -Category license -EventName 'offline_grace_used' -Severity warning -Data @{ grace_hours=72; license_type=$script:currentLicenseType; license_variant=$offlineVariant; current_version=$script:appVersion; build_channel=$offlineBuildChannel; server_check='offline'; feature_permissions=$(if($offlineFeatures){$offlineFeatures}else{'nincs'}) }
                     return $true
                 }
             } catch { }
@@ -779,7 +781,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.5.0" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
+        Title="SoundLift V1.5.1" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -949,7 +951,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.5.0" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.5.1" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="15" Padding="17,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
         <StackPanel>
@@ -1036,7 +1038,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.5.0" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.5.1" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,5,0,4"/>
@@ -1227,7 +1229,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.5.0'
+$script:trayIcon.Text = 'SoundLift V1.5.1'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -2340,6 +2342,11 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.5.1 – RÉSZLETES, TAKARÉKOS LICENCNAPLÓZÁS
+• A licencnapló mutatja a licenc típusát, állapotát, buildjét, gépkötését és az engedélyezett egyedi funkciókat.
+• A gépcsere, a visszavont vagy tiltott licenc és az offline ellenőrzés külön, egyértelmű eseményként jelenik meg.
+• A normál online ellenőrzések naponta egyszer kerülnek a Discord-naplóba, így nem fogyasztják feleslegesen a Supabase- és webhook-keretet.
+
 V1.5.0 – TELJES FELÜLETI MEGÚJULÁS
 • A főablak tágasabb, egységesebb kártyákat, mezőket és állapotjelzést kapott.
 • Minden SoundLift-ablak automatikusan a kiválasztott téma színeit használja.
