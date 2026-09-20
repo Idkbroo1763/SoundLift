@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.6.7'
+$script:appVersion = '2.0.0'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -822,7 +822,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.6.7" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
+        Title="SoundLift V2.0.0" Width="1320" Height="900" MinWidth="1100" MinHeight="760"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -894,6 +894,14 @@ $xaml = @'
     <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource UtilityButton}">
       <Setter Property="Foreground" Value="#FF7A8A"/><Setter Property="Background" Value="#241014"/>
       <Setter Property="BorderBrush" Value="#5A2029"/><Setter Property="Padding" Value="16,10"/>
+    </Style>
+    <Style x:Key="QuickProfileButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="13,11"/><Setter Property="Margin" Value="0,0,0,8"/><Setter Property="HorizontalContentAlignment" Value="Left"/>
+    </Style>
+    <Style x:Key="DashboardCard" TargetType="Border">
+      <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="18"/><Setter Property="Padding" Value="22,18"/><Setter Property="Effect" Value="{StaticResource CardShadow}"/>
     </Style>
     <Style TargetType="TextBox">
       <Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="13"/>
@@ -986,13 +994,14 @@ $xaml = @'
   </Window.Resources>
 
   <Grid Background="{DynamicResource PageGradient}">
-    <Grid.RowDefinitions><RowDefinition Height="96"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="118"/><RowDefinition Height="*"/></Grid.RowDefinitions>
 
-    <Grid Grid.Row="0" Margin="30,20,30,13">
+    <Grid Grid.Row="0" Margin="30,20,30,14">
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
-        <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.6.7" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="JOBB HANGZÁS." FontFamily="Segoe UI Black" FontSize="17" Foreground="{DynamicResource PrimaryTextBrush}"/>
+        <TextBlock Text="NAGYOBB ÉLMÉNY." FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}" Margin="0,-2,0,0"/>
+        <TextBlock Text="SOUNDLIFT 2  •  A hangod, a szabályaid." FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,4,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="15" Padding="17,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
         <StackPanel>
@@ -1003,26 +1012,29 @@ $xaml = @'
     </Grid>
 
     <Grid Grid.Row="1" Margin="30,0,30,28">
-      <Grid.ColumnDefinitions><ColumnDefinition Width="245"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
 
       <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}" CornerRadius="18" Padding="16" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
         <Grid>
           <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-          <TextBlock Text="HANGPROFILOK" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}" Margin="5,2,0,13"/>
+          <StackPanel>
+            <TextBlock Text="GYORS PROFILOK" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}" Margin="5,2,0,4"/>
+            <TextBlock Text="Mindig kéznél, egy kattintásra" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" Margin="5,0,0,13"/>
+          </StackPanel>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Margin="0,0,0,4">
           <StackPanel Name="ProfilePanel">
-            <Button Name="MusicButton" Content="♫   Zene"/>
-            <Button Name="GameButton" Content="◆   FiveM RP"/>
-            <Button Name="CombatButton" Content="⌁   FiveM PvP"/>
-            <Button Name="R6Button" Content="◎   Rainbow Six Siege"/>
-            <Button Name="DiscordButton" Content="◉   Discord"/>
-            <Button Name="MovieButton" Content="▶   Film"/>
-            <Button Name="HeavyButton" Content="ϟ   Erőteljes basszus"/>
-            <Button Name="ResetButton" Content="↺   Alapbeállítások"/>
+            <Button Name="MusicButton" Content="♫   Zene" Style="{StaticResource QuickProfileButton}"/>
+            <Button Name="GameButton" Content="◆   FiveM RP" Style="{StaticResource QuickProfileButton}"/>
+            <Button Name="CombatButton" Content="⌁   FiveM PvP" Style="{StaticResource QuickProfileButton}"/>
+            <Button Name="R6Button" Content="◎   Rainbow Six Siege" Style="{StaticResource QuickProfileButton}"/>
+            <Button Name="DiscordButton" Content="◉   Discord" Style="{StaticResource QuickProfileButton}"/>
+            <Button Name="MovieButton" Content="▶   Film" Style="{StaticResource QuickProfileButton}"/>
+            <Button Name="HeavyButton" Content="ϟ   Erőteljes basszus" Style="{StaticResource QuickProfileButton}"/>
+            <Button Name="ResetButton" Content="↺   Alapbeállítások" Style="{StaticResource QuickProfileButton}"/>
             <TextBlock Name="CustomFeaturesTitle" Text="EGYEDI FUNKCIÓK" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}" Margin="4,12,0,5" Visibility="Collapsed"/>
-            <Button Name="ExtraBassProButton" Content="✦   Extra mélyhang Pro" Visibility="Collapsed"/>
-            <Button Name="VoiceBoostButton" Content="◈   Beszédkiemelés" Visibility="Collapsed"/>
-            <Button Name="CustomPresetXButton" Content="◆   Egyéni profil X" Visibility="Collapsed"/>
+            <Button Name="ExtraBassProButton" Content="✦   Extra mélyhang Pro" Style="{StaticResource QuickProfileButton}" Visibility="Collapsed"/>
+            <Button Name="VoiceBoostButton" Content="◈   Beszédkiemelés" Style="{StaticResource QuickProfileButton}" Visibility="Collapsed"/>
+            <Button Name="CustomPresetXButton" Content="◆   Egyéni profil X" Style="{StaticResource QuickProfileButton}" Visibility="Collapsed"/>
             <Button Name="ProfileOrderButton" Content="☰   Profilok rendezése" Style="{StaticResource UtilityButton}" Margin="0,10,0,4"/>
           </StackPanel>
           </ScrollViewer>
@@ -1080,7 +1092,7 @@ $xaml = @'
               </ComboBox.Resources>
             </ComboBox>
             <Button Name="CustomThemeButton" Content="✎   Egyéni téma szerkesztése" Style="{StaticResource UtilityButton}" Margin="0,0,0,9" Visibility="Collapsed"/>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.6.7" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 2.0.0" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,5,0,4"/>
@@ -1095,16 +1107,23 @@ $xaml = @'
 
       <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
         <StackPanel>
-          <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="18" Padding="22,17" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}" Margin="0,0,0,14">
+          <Border Style="{StaticResource DashboardCard}" Margin="0,0,0,14">
             <Grid>
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="26"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-              <StackPanel>
-                <DockPanel><TextBlock Text="Hangerő erősítése" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/><TextBlock Name="VolumeValue" Text="100%" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Right"/></DockPanel>
+              <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <Grid Width="172" Height="172" VerticalAlignment="Center">
+                <Ellipse Stroke="{DynamicResource BorderBrush}" StrokeThickness="12" Fill="{DynamicResource SurfaceAltBrush}"/>
+                <Ellipse Stroke="{DynamicResource AccentTextBrush}" StrokeThickness="7" Margin="10" Opacity="0.9"/>
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                  <TextBlock Name="VolumeValue" Text="100%" FontFamily="Segoe UI Black" FontSize="35" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center"/>
+                  <TextBlock Text="HANGERŐ" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                </StackPanel>
+              </Grid>
+              <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                <TextBlock Text="FŐ HANGVEZÉRLÉS" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}" Margin="0,0,0,5"/>
+                <TextBlock Text="Hangerő erősítése" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/>
                 <Slider Name="VolumeSlider" Minimum="0" Maximum="300" Value="100" TickFrequency="5" IsSnapToTickEnabled="True"/>
                 <TextBlock Text="0% = némítás  •  100% = eredeti hangerő  •  maximum 300%" FontSize="11" Foreground="{DynamicResource MutedTextBrush}"/>
-              </StackPanel>
-              <StackPanel Grid.Column="2">
-                <DockPanel><TextBlock Text="Mélyhangkiemelés" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/><TextBlock Name="BassValue" Text="6 dB" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Right"/></DockPanel>
+                <DockPanel Margin="0,12,0,0"><TextBlock Text="Mélyhangkiemelés" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/><TextBlock Name="BassValue" Text="6 dB" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Right"/></DockPanel>
                 <Slider Name="BassSlider" Minimum="0" Maximum="24" Value="6" TickFrequency="1" IsSnapToTickEnabled="True"/>
                 <TextBlock Text="A basszus ereje 0 és 24 dB között" FontSize="11" Foreground="{DynamicResource MutedTextBrush}"/>
               </StackPanel>
@@ -1271,7 +1290,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.6.7'
+$script:trayIcon.Text = 'SoundLift V2.0.0'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','CustomThemeButton','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -1464,6 +1483,14 @@ function Set-Profile([int]$volume, [int]$bass, [int]$frequency, [bool]$safe = $t
     $VolumeSlider.Value = $volume; $BassSlider.Value = $bass; $FrequencySlider.Value = $frequency
     $displayName = Get-SoundLiftProfileDisplayName $script:activeProfile
     $SafetyCheck.IsChecked = $safe; $ActiveProfileText.Text = "Aktív profil: $displayName"; Update-Labels
+    $profileButtons = @($MusicButton,$GameButton,$CombatButton,$R6Button,$DiscordButton,$MovieButton,$HeavyButton,$ResetButton,$ExtraBassProButton,$VoiceBoostButton,$CustomPresetXButton)
+    foreach ($profileButton in $profileButtons) { if ($profileButton) { $profileButton.Background = $window.Resources['SurfaceAltBrush']; $profileButton.BorderBrush = $window.Resources['BorderBrush'] } }
+    $activeButton = switch ($script:activeProfile) {
+        'Music' { $MusicButton }; 'FiveM RP' { $GameButton }; 'FiveM Combat' { $CombatButton }; 'R6' { $R6Button }
+        'Discord' { $DiscordButton }; 'Movie' { $MovieButton }; 'Heavy' { $HeavyButton }; 'Custom' { $ResetButton }
+        'Extra Bass Pro' { $ExtraBassProButton }; 'Voice Boost' { $VoiceBoostButton }; 'Custom Preset X' { $CustomPresetXButton }
+    }
+    if ($activeButton) { $activeButton.Background = $window.Resources['AccentGradient']; $activeButton.BorderBrush = $window.Resources['AccentTextBrush'] }
     Add-ProfileStatistic $script:activeProfile
     Show-ProfileOverlay $displayName
 }
@@ -2472,6 +2499,12 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V2.0.0 – ÚJ SOUNDLIFT DASHBOARD
+• Teljesen megújult, modernebb fekete-piros főképernyő kártyás elrendezéssel.
+• Az összes hangprofil állandóan látható maradt a Gyors profilok sávban, így nincs szükség külön menü megnyitására.
+• Új, központi hangerőkijelző és áttekinthetőbb fő hangvezérlés.
+• A meglévő témák, hangszínszabályzó, diagnosztika, licenckezelés és automatikus javítás változatlanul elérhető.
+
 V1.6.7 – TÉMALISTA PONTOSÍTÁSA
 • Az Arctic téma kikerült a SoundLiftből.
 • Az R6 Siege téma új neve Carbon Gold, amely pontosabban leírja a sötét, arany kiemelésű megjelenést.
