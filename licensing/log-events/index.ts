@@ -13,6 +13,7 @@ const clientEvents = new Set([
   "license_rejected", "developer_license_used",
   "discord_link_required", "discord_link_succeeded", "discord_link_cancelled", "discord_link_check_failed", "discord_link_offline_grace_used",
   "manual_diagnostic_report",
+  "automatic_repair_result",
 ]);
 
 function reply(status: number, body: Record<string, unknown>) {
