@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.5.1'
+$script:appVersion = '1.6.0'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -47,6 +47,10 @@ $script:nightModeEnabled = $false
 # EXE-ben aktiválható customer vagy developer licenc.
 $script:licenseMode = 'universal'
 $script:currentLicenseType = 'free'
+$script:currentLicenseStatus = 'inactive'
+$script:currentLicenseVariant = 'ingyenes'
+$script:currentLicenseActivatedUtc = ''
+$script:currentLicenseDeviceRef = ''
 $script:isOwner = $false
 $script:licenseFeatures = @{}
 $script:simulatedLicenseLabel = ''
@@ -606,10 +610,10 @@ function Get-SavedLicenseState {
     try { return Unprotect-LicenseState ([IO.File]::ReadAllText($path)) } catch { return $null }
 }
 
-function Save-LicenseState([string]$licenseKey, [string]$licenseType, [string]$authorizationId, [object[]]$features, [bool]$isOwner) {
+function Save-LicenseState([string]$licenseKey, [string]$licenseType, [string]$authorizationId, [object[]]$features, [bool]$isOwner, [string]$licenseStatus = 'active', [string]$licenseVariant = '', [string]$activatedUtc = '', [string]$deviceRef = '') {
     $directory = Join-Path $env:APPDATA 'SoundLift'
     if (-not (Test-Path $directory)) { [void][IO.Directory]::CreateDirectory($directory) }
-    $state = [PSCustomObject]@{ key=$licenseKey.Trim(); licenseType=$licenseType; authorizationId=$authorizationId; features=@($features); isOwner=$isOwner; lastSuccessUtc=[DateTime]::UtcNow.ToString('o') }
+    $state = [PSCustomObject]@{ key=$licenseKey.Trim(); licenseType=$licenseType; authorizationId=$authorizationId; features=@($features); isOwner=$isOwner; licenseStatus=$licenseStatus; licenseVariant=$licenseVariant; activatedUtc=$activatedUtc; deviceRef=$deviceRef; lastSuccessUtc=[DateTime]::UtcNow.ToString('o') }
     [IO.File]::WriteAllText((Join-Path $directory 'license.dat'), (Protect-LicenseState $state), [Text.Encoding]::UTF8)
 }
 
@@ -617,6 +621,7 @@ function Remove-LicenseState {
     $path = Join-Path $env:APPDATA 'SoundLift\license.dat'
     if (Test-Path $path) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue }
     $script:currentLicenseType = 'free'
+    $script:currentLicenseStatus = 'inactive'; $script:currentLicenseVariant = 'ingyenes'; $script:currentLicenseActivatedUtc = ''; $script:currentLicenseDeviceRef = ''
     $script:isOwner = $false; $script:licenseFeatures = @{}; $script:simulatedLicenseLabel = ''
 }
 
@@ -664,10 +669,14 @@ function Set-LicenseFeatures([object[]]$features) {
 function Set-LicenseResponse([object]$response, [switch]$Persist, [string]$licenseKey = '') {
     $script:currentLicenseType = if ($response.license_type) { [string]$response.license_type } else { 'customer' }
     $script:isOwner = ($response.is_owner -eq $true)
+    $script:currentLicenseStatus = if ($response.license_status) { [string]$response.license_status } else { 'active' }
+    $script:currentLicenseVariant = if ($response.license_variant) { [string]$response.license_variant } elseif ($script:currentLicenseType -eq 'developer') { 'fejlesztői' } else { 'normál' }
+    $script:currentLicenseActivatedUtc = [string]$response.activated_at
+    $script:currentLicenseDeviceRef = [string]$response.device_ref
     Set-LicenseFeatures @($response.features)
     $script:simulatedLicenseLabel = if ($response.simulated_license) { [string]$response.simulated_license.label } else { '' }
     if ($Persist -and -not [string]::IsNullOrWhiteSpace($licenseKey) -and -not $response.simulated_license) {
-        Save-LicenseState $licenseKey $script:currentLicenseType ([string]$response.authorization_id) @($response.features) $script:isOwner
+        Save-LicenseState $licenseKey $script:currentLicenseType ([string]$response.authorization_id) @($response.features) $script:isOwner $script:currentLicenseStatus $script:currentLicenseVariant $script:currentLicenseActivatedUtc $script:currentLicenseDeviceRef
     }
 }
 
@@ -718,6 +727,9 @@ function Confirm-SoundLiftLicense {
             # visszavont feature flagek legfeljebb egy órán belül frissülnek.
             if ($cachedAge -ge 0 -and $cachedAge -le 1) {
                 $script:currentLicenseType = if ($saved.licenseType) { [string]$saved.licenseType } else { 'customer' }
+                $script:currentLicenseStatus = if ($saved.licenseStatus) { [string]$saved.licenseStatus } else { 'active' }
+                $script:currentLicenseVariant = if ($saved.licenseVariant) { [string]$saved.licenseVariant } elseif ($script:currentLicenseType -eq 'developer') { 'fejlesztői' } else { 'normál' }
+                $script:currentLicenseActivatedUtc = [string]$saved.activatedUtc; $script:currentLicenseDeviceRef = [string]$saved.deviceRef
                 $script:isOwner = ($saved.isOwner -eq $true); Set-LicenseFeatures @($saved.features)
                 return $true
             }
@@ -746,6 +758,9 @@ function Confirm-SoundLiftLicense {
             try {
                 if (([DateTime]::UtcNow - [DateTime]::Parse([string]$saved.lastSuccessUtc).ToUniversalTime()).TotalHours -le 72) {
                     $script:currentLicenseType = if ($saved.licenseType) { [string]$saved.licenseType } else { 'customer' }
+                    $script:currentLicenseStatus = if ($saved.licenseStatus) { [string]$saved.licenseStatus } else { 'active' }
+                    $script:currentLicenseVariant = if ($saved.licenseVariant) { [string]$saved.licenseVariant } elseif ($script:currentLicenseType -eq 'developer') { 'fejlesztői' } else { 'normál' }
+                    $script:currentLicenseActivatedUtc = [string]$saved.activatedUtc; $script:currentLicenseDeviceRef = [string]$saved.deviceRef
                     $script:isOwner = ($saved.isOwner -eq $true); Set-LicenseFeatures @($saved.features)
                     $offlineFeatures = @($saved.features | ForEach-Object { [string]$_.feature_key } | Where-Object { $_ }) -join ', '
                     $offlineVariant = if ($script:currentLicenseType -eq 'developer') { 'fejlesztői' } elseif ($offlineFeatures) { 'egyedi' } else { 'normál' }
@@ -781,7 +796,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.5.1" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
+        Title="SoundLift V1.6.0" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -951,7 +966,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.5.1" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.6.0" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="15" Padding="17,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
         <StackPanel>
@@ -1038,7 +1053,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.5.1" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.6.0" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,5,0,4"/>
@@ -1229,7 +1244,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.5.1'
+$script:trayIcon.Text = 'SoundLift V1.6.0'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -1818,39 +1833,65 @@ function Show-DiagnosticsWindow {
 
 $DiagnosticsButton.Add_Click({ Show-DiagnosticsWindow })
 
-function Repair-SoundLiftApoInclude {
+function Get-SoundLiftApoHealth {
+    $apoDirectory = Get-ApoConfigDirectory
+    if (-not $apoDirectory) { return [PSCustomObject]@{ Healthy=$false; Code='APO_NOT_FOUND'; Message='Az Equalizer APO nem található.' } }
+    $mainConfig = Join-Path $apoDirectory 'config.txt'
+    if (-not (Test-Path $mainConfig)) { return [PSCustomObject]@{ Healthy=$false; Code='CONFIG_MISSING'; Message='Az Equalizer APO config.txt fájlja hiányzik.' } }
+    try { $mainText = Read-TextWithRetry $mainConfig } catch { return [PSCustomObject]@{ Healthy=$false; Code='CONFIG_UNREADABLE'; Message='Az Equalizer APO konfigurációja nem olvasható.' } }
+    if ($mainText -notmatch '(?im)^\s*Include:\s*SoundLift\.txt\s*$') { return [PSCustomObject]@{ Healthy=$false; Code='INCLUDE_MISSING'; Message='A SoundLift APO-kapcsolata hiányzik.' } }
+    $ownConfig = Join-Path $apoDirectory 'SoundLift.txt'
+    if (-not (Test-Path $ownConfig)) { return [PSCustomObject]@{ Healthy=$false; Code='SOUNDLIFT_CONFIG_MISSING'; Message='A SoundLift hangkonfigurációja hiányzik.' } }
+    try { $ownText = Read-TextWithRetry $ownConfig } catch { return [PSCustomObject]@{ Healthy=$false; Code='SOUNDLIFT_CONFIG_UNREADABLE'; Message='A SoundLift hangkonfigurációja nem olvasható.' } }
+    if ($ownText -notmatch '(?im)^\s*Preamp:\s*-?[0-9]+(?:[.,][0-9]+)?\s*dB\s*$') { return [PSCustomObject]@{ Healthy=$false; Code='SOUNDLIFT_CONFIG_INVALID'; Message='A SoundLift hangkonfigurációja sérült.' } }
+    return [PSCustomObject]@{ Healthy=$true; Code='OK'; Message='A SoundLift hangkapcsolata megfelelő.' }
+}
+
+function Repair-SoundLiftApoInclude([switch]$Automatic) {
+    $repairCode = 'UNKNOWN'
     try {
-        $apoDirectory = Get-ApoConfigDirectory
-        if (-not $apoDirectory) { throw 'Az Equalizer APO konfigurációs mappája nem található.' }
-        $mainConfig = Join-Path $apoDirectory 'config.txt'
-        if (-not (Test-Path $mainConfig)) { throw 'Az Equalizer APO config.txt fájlja nem található.' }
-
-        $mainText = Read-TextWithRetry $mainConfig
-        if ($mainText -match '(?im)^\s*Include:\s*SoundLift\.txt\s*$') {
-            $StatusText.Text = 'Az APO-kapcsolat már megfelelő, nincs szükség javításra'
-            $StatusBorder.Background = '#143126'
-            Show-SoundLiftMessage 'Nincs szükség javításra: a SoundLift Include sora már megfelelő.' 'SoundLift – APO javítás' 'OK' 'Information' $window | Out-Null
-            return
+        $before = Get-SoundLiftApoHealth; $repairCode = [string]$before.Code
+        if ($before.Healthy) {
+            if (-not $Automatic) { Show-SoundLiftMessage 'Nincs szükség javításra: a SoundLift hangkapcsolata megfelelő.' 'SoundLift – APO javítás' 'OK' 'Information' $window | Out-Null }
+            return $true
         }
-
+        $apoDirectory = Get-ApoConfigDirectory
+        if (-not $apoDirectory) { throw 'APO_NOT_FOUND: Az Equalizer APO konfigurációs mappája nem található.' }
+        $mainConfig = Join-Path $apoDirectory 'config.txt'
+        if (-not (Test-Path $mainConfig)) { throw 'CONFIG_MISSING: Az Equalizer APO config.txt fájlja nem található.' }
+        $mainText = Read-TextWithRetry $mainConfig
         $backupPath = Join-Path $apoDirectory 'config.before-SoundLift-repair.bak'
         if (-not (Test-Path $backupPath)) { [IO.File]::Copy($mainConfig, $backupPath, $false) }
         $mainText = [Regex]::Replace($mainText, '(?im)^\s*#\s*SoundLift\s*\r?\n\s*Include:[^\r\n]+\r?\n?', '')
         $mainText = [Regex]::Replace($mainText, '(?im)^\s*Include:\s*SoundLift(?:[ .][^\r\n]*)?\.txt\s*\r?\n?', '')
         $mainText = $mainText.TrimEnd() + "`r`n`r`n# SoundLift`r`nInclude: SoundLift.txt`r`n"
         Write-TextWithRetry $mainConfig $mainText
-
-        $verified = Read-TextWithRetry $mainConfig
-        if ($verified -notmatch '(?im)^\s*Include:\s*SoundLift\.txt\s*$') { throw 'A javítás ellenőrzése sikertelen volt.' }
+        $intermediate = Get-SoundLiftApoHealth
+        if ($intermediate.Code -in @('SOUNDLIFT_CONFIG_MISSING','SOUNDLIFT_CONFIG_UNREADABLE','SOUNDLIFT_CONFIG_INVALID')) { Invoke-ApplyButton }
+        $after = Get-SoundLiftApoHealth
+        if (-not $after.Healthy) { throw "REPAIR_VERIFY_FAILED: $($after.Code)" }
         $StatusText.Text = 'Az APO-kapcsolat sikeresen helyreállt'
         $StatusBorder.Background = '#143126'
-        Write-SoundLiftLog -Category startup -EventName 'apo_include_repaired' -Data @{ result='success' }
-        Show-SoundLiftMessage "A SoundLift Include sora sikeresen helyreállt.`n`nAz eredeti config.txt biztonsági mentése is elkészült." 'SoundLift – APO javítás' 'OK' 'Information' $window | Out-Null
+        Write-SoundLiftLog -Category startup -EventName 'automatic_repair_result' -Data @{ result='success'; code=$repairCode; component='apo_config' }
+        if (-not $Automatic) { Show-SoundLiftMessage "A SoundLift hangkapcsolata sikeresen helyreállt.`n`nAz eredeti config.txt biztonsági mentése is elkészült." 'SoundLift – APO javítás' 'OK' 'Information' $window | Out-Null }
+        return $true
     } catch {
-        Write-SoundLiftLog -Category crash -EventName 'handled_runtime_error' -Severity error -Data @{ component='apo_include_repair' } -ErrorRecord $_
+        $shortCode = if ($_.Exception.Message -match '^([A-Z_]+):') { $Matches[1] } else { $repairCode }
+        Write-SoundLiftLog -Category crash -EventName 'automatic_repair_result' -Severity error -Data @{ result='failed'; code=$shortCode; component='apo_config' } -ErrorRecord $_
         $StatusText.Text = "Az APO-kapcsolat nem javítható: $($_.Exception.Message)"
         $StatusBorder.Background = '#4A1F2D'
-        Show-SoundLiftMessage "A javítás nem sikerült:`n$($_.Exception.Message)" 'SoundLift – APO javítás' 'OK' 'Error' $window | Out-Null
+        if (-not $Automatic) { Show-SoundLiftMessage "A javítás nem sikerült ($shortCode):`n$($_.Exception.Message)" 'SoundLift – APO javítás' 'OK' 'Error' $window | Out-Null }
+        return $false
+    }
+}
+
+function Test-AndOfferSoundLiftRepair {
+    $health = Get-SoundLiftApoHealth
+    if ($health.Healthy) { return }
+    $answer = Show-SoundLiftMessage "$($health.Message)`n`nHibakód: $($health.Code)`n`nMegpróbálja a SoundLift egy kattintással kijavítani?" 'SoundLift – Javítás szükséges' 'YesNo' 'Warning' $window
+    if ($answer -eq 'Yes') {
+        if (Repair-SoundLiftApoInclude -Automatic) { Show-SoundLiftMessage 'A javítás sikerült. A hangkapcsolat ismét működik.' 'SoundLift – Javítás kész' 'OK' 'Information' $window | Out-Null }
+        else { Show-SoundLiftMessage 'Az automatikus javítás nem sikerült. Nyisd meg a Rendszer ellenőrzése részt a részletekért.' 'SoundLift – Javítás sikertelen' 'OK' 'Error' $window | Out-Null }
     }
 }
 
@@ -2063,7 +2104,30 @@ function Update-DeveloperControls {
 
 $OwnerModeButton.Add_Click({Show-OwnerLicenseSimulator})
 
+function Show-LicenseManagerWindow {
+    $saved = Get-SavedLicenseState
+    if (-not $saved -or -not $saved.key) { return }
+    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Licenckezelő';$dialog.Width=650;$dialog.Height=570;$dialog.MinWidth=560;$dialog.MinHeight=500;$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;Set-SoundLiftWindowStyle $dialog
+    $root=[Windows.Controls.Grid]::new();$root.Margin=[Windows.Thickness]::new(26);$root.RowDefinitions.Add([Windows.Controls.RowDefinition]::new());$actionsRow=[Windows.Controls.RowDefinition]::new();$actionsRow.Height=[Windows.GridLength]::Auto;$root.RowDefinitions.Add($actionsRow)
+    $scroll=[Windows.Controls.ScrollViewer]::new();$scroll.VerticalScrollBarVisibility='Auto';$panel=[Windows.Controls.StackPanel]::new()
+    $title=[Windows.Controls.TextBlock]::new();$title.Text='Licenc adatai';$title.FontSize=25;$title.FontWeight='Bold';$title.Foreground=$window.Resources['PrimaryTextBrush'];$title.Margin=[Windows.Thickness]::new(0,0,0,16)
+    $variant=if($script:currentLicenseVariant){$script:currentLicenseVariant}else{'normál'};$statusMap=@{active='aktív';suspended='felfüggesztve';revoked='visszavonva';inactive='inaktív'};$statusText=if($statusMap.ContainsKey($script:currentLicenseStatus)){$statusMap[$script:currentLicenseStatus]}else{$script:currentLicenseStatus}
+    $activated='nem érhető el';if($script:currentLicenseActivatedUtc){try{$activated=([DateTime]::Parse($script:currentLicenseActivatedUtc).ToLocalTime()).ToString('yyyy. MM. dd. HH:mm')}catch{}}
+    $features=@($script:licenseFeatures.Values|ForEach-Object{if($_.display_name){[string]$_.display_name}else{[string]$_.feature_key}}|Sort-Object);$featureText=if($features.Count){$features-join "`n• "}else{'Nincs külön egyedi funkció'}
+    $details=[Windows.Controls.TextBlock]::new();$details.Text="Licenc típusa: $variant`nÁllapot: $statusText`nGéphez kötés: $activated`nGépazonosító röviden: $(if($script:currentLicenseDeviceRef){$script:currentLicenseDeviceRef}else{'nem érhető el'})`n`nEngedélyezett egyedi funkciók:`n• $featureText";$details.TextWrapping='Wrap';$details.FontSize=14;$details.LineHeight=23;$details.Foreground=$window.Resources['SecondaryTextBrush']
+    $notice=[Windows.Controls.TextBlock]::new();$notice.Text='A gépcsere-kérelem nem választja le azonnal a jelenlegi gépet. A kérelmet az adminisztrátor ellenőrzi, így a licenced addig is működőképes marad.';$notice.TextWrapping='Wrap';$notice.Margin=[Windows.Thickness]::new(0,20,0,0);$notice.Padding=[Windows.Thickness]::new(14);$notice.Background=$window.Resources['ControlBrush'];$notice.Foreground=$window.Resources['SecondaryTextBrush']
+    [void]$panel.Children.Add($title);[void]$panel.Children.Add($details);[void]$panel.Children.Add($notice);$scroll.Content=$panel;[Windows.Controls.Grid]::SetRow($scroll,0);[void]$root.Children.Add($scroll)
+    $actions=[Windows.Controls.StackPanel]::new();$actions.Orientation='Horizontal';$actions.HorizontalAlignment='Right';$actions.Margin=[Windows.Thickness]::new(0,18,0,0)
+    $refresh=[Windows.Controls.Button]::new();$refresh.Content='Adatok frissítése';$refresh.Width=140;$refresh.Style=$window.Resources['UtilityButton'];$refresh.Margin=[Windows.Thickness]::new(0,0,10,0)
+    $transfer=[Windows.Controls.Button]::new();$transfer.Content='Gépcsere kérelmezése';$transfer.Width=175;$transfer.Style=$window.Resources['UtilityButton'];$transfer.Margin=[Windows.Thickness]::new(0,0,10,0)
+    $close=[Windows.Controls.Button]::new();$close.Content='Bezárás';$close.Width=105;$close.Style=$window.Resources['PrimaryButton'];$close.Add_Click({$dialog.Close()}.GetNewClosure())
+    $refresh.Add_Click({try{$response=Invoke-LicenseApi ([string]$saved.key);if($response.allowed){Set-LicenseResponse $response -Persist -licenseKey ([string]$saved.key);Update-DeveloperControls;$dialog.Close();Show-LicenseManagerWindow}}catch{Show-SoundLiftMessage 'A licencadatok most nem frissíthetők.' 'Licenckezelő' 'OK' 'Warning' $dialog|Out-Null}}.GetNewClosure())
+    $transfer.Add_Click({$answer=Show-SoundLiftMessage 'Elküldöd a gépcsere-kérelmet? A jelenlegi gép nem kerül automatikusan leválasztásra.' 'SoundLift – Gépcsere' 'YesNo' 'Question' $dialog;if($answer -ne 'Yes'){return};try{$response=Invoke-LicenseApi ([string]$saved.key) 'request_device_change';Show-SoundLiftMessage ([string]$response.message) 'SoundLift – Gépcsere' 'OK' 'Information' $dialog|Out-Null;$transfer.IsEnabled=$false;$transfer.Content='Kérelem elküldve'}catch{Show-SoundLiftMessage "A kérelem nem küldhető el:`n$($_.Exception.Message)" 'SoundLift – Gépcsere' 'OK' 'Error' $dialog|Out-Null}}.GetNewClosure())
+    foreach($button in @($refresh,$transfer,$close)){[void]$actions.Children.Add($button)};[Windows.Controls.Grid]::SetRow($actions,1);[void]$root.Children.Add($actions);$dialog.Content=$root;$dialog.ShowDialog()|Out-Null
+}
+
 $LicenseButton.Add_Click({
+    if ($script:currentLicenseType -ne 'free') { Show-LicenseManagerWindow; return }
     if (Confirm-SoundLiftLicense -PromptForKey) {
         Update-DeveloperControls
         if ($script:currentLicenseType -ne 'free') {
@@ -2342,6 +2406,13 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.6.0 – BEÁLLÍTÓVARÁZSLÓ, AUTOMATIKUS JAVÍTÁS ÉS LICENCKEZELŐ
+• Az első indítás varázslója ellenőrzi és javítja az APO-kapcsolatot, megnyitja a hangeszközválasztót, hangtesztet futtat és kezdőprofilt alkalmaz.
+• Az automatikus javítás felismeri a hiányzó Include sort, valamint a hiányzó, sérült vagy olvashatatlan SoundLift-konfigurációt, és biztonsági mentéssel állítja helyre.
+• A javítás sikerét vagy rövid hibakódját külön technikai esemény naplózza.
+• Az új licenckezelő mutatja a licenc típusát, állapotát, gépkötését és az engedélyezett egyedi funkciókat.
+• A gépcsere közvetlenül az alkalmazásból kérelmezhető, a jelenlegi gép az adminisztrátori jóváhagyásig használható marad.
+
 V1.5.1 – RÉSZLETES, TAKARÉKOS LICENCNAPLÓZÁS
 • A licencnapló mutatja a licenc típusát, állapotát, buildjét, gépkötését és az engedélyezett egyedi funkciókat.
 • A gépcsere, a visszavont vagy tiltott licenc és az offline ellenőrzés külön, egyértelmű eseményként jelenik meg.
@@ -2585,8 +2656,11 @@ function Show-FirstRunWizard {
     $content = [Windows.Controls.StackPanel]::new()
     $stepText = [Windows.Controls.TextBlock]::new(); $stepText.Foreground = [Windows.Media.Brushes]::Gray; $stepText.FontSize = 12
     $titleText = [Windows.Controls.TextBlock]::new(); $titleText.Foreground = [Windows.Media.Brushes]::White; $titleText.FontSize = 26; $titleText.FontWeight = 'Bold'; $titleText.Margin = [Windows.Thickness]::new(0,10,0,16)
-    $bodyText = [Windows.Controls.TextBlock]::new(); $bodyText.Foreground = [Windows.Media.Brushes]::LightGray; $bodyText.FontSize = 15; $bodyText.LineHeight = 25; $bodyText.TextWrapping = 'Wrap'
-    $content.Children.Add($stepText) | Out-Null; $content.Children.Add($titleText) | Out-Null; $content.Children.Add($bodyText) | Out-Null
+    $bodyText = [Windows.Controls.TextBlock]::new(); $bodyText.Foreground = $window.Resources['SecondaryTextBrush']; $bodyText.FontSize = 15; $bodyText.LineHeight = 25; $bodyText.TextWrapping = 'Wrap'
+    $actionButton = [Windows.Controls.Button]::new(); $actionButton.Width=260; $actionButton.Height=42; $actionButton.HorizontalAlignment='Left'; $actionButton.Margin=[Windows.Thickness]::new(0,18,0,0); $actionButton.Style=$window.Resources['UtilityButton']; $actionButton.Visibility='Collapsed'
+    $profileChoice = [Windows.Controls.ComboBox]::new(); $profileChoice.Width=260; $profileChoice.Height=40; $profileChoice.HorizontalAlignment='Left'; $profileChoice.Margin=[Windows.Thickness]::new(0,18,0,0); $profileChoice.Visibility='Collapsed'
+    foreach($profileName in @('Zene – ajánlott','FiveM RP','FiveM PvP','Rainbow Six Siege','Film','Alapbeállítások')){[void]$profileChoice.Items.Add($profileName)}; $profileChoice.SelectedIndex=0
+    $content.Children.Add($stepText) | Out-Null; $content.Children.Add($titleText) | Out-Null; $content.Children.Add($bodyText) | Out-Null; $content.Children.Add($actionButton)|Out-Null; $content.Children.Add($profileChoice)|Out-Null
     [Windows.Controls.Grid]::SetRow($content, 0); $root.Children.Add($content) | Out-Null
     $nav = [Windows.Controls.StackPanel]::new(); $nav.Orientation = 'Horizontal'; $nav.HorizontalAlignment = 'Right'; $nav.Margin = [Windows.Thickness]::new(0,20,0,0)
     $back = [Windows.Controls.Button]::new(); $back.Content = 'Vissza'; $back.Width = 105; $back.Height = 38; $back.Margin = [Windows.Thickness]::new(0,0,10,0)
@@ -2597,14 +2671,16 @@ function Show-FirstRunWizard {
     $apoState = if ($apo) { 'Telepítve' } else { 'Nem található' }
     $pages = @(
         @{ Title='Üdv a SoundLiftben!'; Body="Ez a rövid beállítás segít, hogy a hangerő- és EQ-profilok valóban a megfelelő hangeszközön működjenek.`n`nA program az Equalizer APO-ra épül, ezért annak telepítve kell lennie." },
-        @{ Title='Gyors rendszerellenőrzés'; Body="Equalizer APO: $apoState`nRendszergazdai futtatás: $adminState`nAktív hangkimenet: $output`n`nHa az APO nem található, telepítsd az Equalizer APO-t, majd indítsd újra ezt a programot." },
-        @{ Title='Adatvédelem és műszaki naplók'; Body="A SoundLift működési, frissítési és hibaeseményeket naplóz a %LOCALAPPDATA%\SoundLift\logs mappába. Ha elérhető a támogatási szolgáltatás, a szükséges technikai eseményeket hibakeresési és biztonsági célból továbbítja.`n`nLicenckulcsot, Windows-felhasználónevet, teljes gépazonosítót és kattintási előzményt nem küldünk. A teljes leírás bármikor megnyitható az Adatvédelem menüben." },
-        @{ Title='A beállítás befejezése'; Body="1. Nyisd meg az APO hangeszközök beállítását.`n2. Jelöld ki az aktív lejátszóeszközt.`n3. Ha az Equalizer APO kéri, indítsd újra a Windowst.`n4. Válassz hangprofilt, majd kattints a Beállítások alkalmazása gombra.`n`nHa valami nem működik, használd a Rendszer ellenőrzése vagy az APO-kapcsolat helyreállítása gombot." }
+        @{ Title='Gyors rendszerellenőrzés'; Body="Equalizer APO: $apoState`nRendszergazdai futtatás: $adminState`nAktív hangkimenet: $output`n`nA gomb ellenőrzi és szükség esetén biztonsági mentéssel javítja a SoundLift hangkapcsolatát."; Action='Ellenőrzés és automatikus javítás' },
+        @{ Title='Hangeszköz kiválasztása'; Body="Nyisd meg az Equalizer APO hangeszközválasztóját, majd jelöld ki azt a lejátszóeszközt, amelyen a SoundLiftet használni szeretnéd.`n`nHa az APO újraindítást kér, a varázsló befejezése után indítsd újra a Windowst."; Action='Hangeszköz kiválasztása' },
+        @{ Title='Hangteszt'; Body="A rövid, halk teszthanggal ellenőrizheted, hogy a kiválasztott hangkimenet működik-e.`n`nA teszt nem módosítja a beállításaidat."; Action='Teszt hang lejátszása' },
+        @{ Title='Ajánlott kezdőprofil'; Body="Válassz egy kezdőprofilt. A Zene profil az ajánlott általános beállítás, és később bármikor lecserélheted.`n`nA Befejezés gomb alkalmazza és elmenti a választást."; Profile=$true }
     )
     $wizardState = @{ Page = 0 }
-    $refreshPage = { $page = [int]$wizardState.Page; $stepText.Text = "ELSŐ INDÍTÁS  •  $($page + 1) / $($pages.Count)"; $titleText.Text = $pages[$page].Title; $bodyText.Text = $pages[$page].Body; $back.IsEnabled = $page -gt 0; $next.Content = if ($page -eq $pages.Count - 1) { 'Befejezés' } else { 'Tovább' } }
+    $refreshPage = { $page = [int]$wizardState.Page; $current=$pages[$page]; $stepText.Text = "ELSŐ INDÍTÁS  •  $($page + 1) / $($pages.Count)"; $titleText.Text = $current.Title; $bodyText.Text = $current.Body; $back.IsEnabled = $page -gt 0; $next.Content = if ($page -eq $pages.Count - 1) { 'Befejezés' } else { 'Tovább' }; $actionButton.Visibility=if($current.Action){'Visible'}else{'Collapsed'}; if($current.Action){$actionButton.Content=$current.Action}; $profileChoice.Visibility=if($current.Profile){'Visible'}else{'Collapsed'} }
+    $actionButton.Add_Click({ switch([int]$wizardState.Page){ 1 { [void](Repair-SoundLiftApoInclude -Automatic); $health=Get-SoundLiftApoHealth; $bodyText.Text="$($pages[1].Body)`n`nEredmény: $($health.Message) [$($health.Code)]" } 2 { Open-SoundLiftDeviceSelector } 3 { Play-TestTone 60 1.5 } } }.GetNewClosure())
     $back.Add_Click({ if ($wizardState.Page -gt 0) { $wizardState.Page--; & $refreshPage } }.GetNewClosure())
-    $next.Add_Click({ if ($wizardState.Page -lt $pages.Count - 1) { $wizardState.Page++; & $refreshPage; return }; try { [IO.File]::WriteAllText($onboardingMarkerPath, 'completed', [Text.Encoding]::UTF8); $state = Get-AppState; $state.onboardingCompleted = $true; $state | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $settingsPath -Encoding UTF8 } catch { }; $wizard.Close() }.GetNewClosure())
+    $next.Add_Click({ if ($wizardState.Page -lt $pages.Count - 1) { $wizardState.Page++; & $refreshPage; return }; $profileButtons=@($MusicButton,$GameButton,$CombatButton,$R6Button,$MovieButton,$ResetButton); $selectedButton=$profileButtons[[Math]::Max(0,$profileChoice.SelectedIndex)]; $selectedButton.RaiseEvent((New-Object Windows.RoutedEventArgs([Windows.Controls.Button]::ClickEvent))); Invoke-ApplyButton; try { [IO.File]::WriteAllText($onboardingMarkerPath, 'completed', [Text.Encoding]::UTF8); $script:onboardingCompleted=$true; $state = Get-AppState; $state.onboardingCompleted = $true; $state | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $settingsPath -Encoding UTF8 } catch { }; $wizard.Close() }.GetNewClosure())
     & $refreshPage; $wizard.Content = $root; $wizard.ShowDialog() | Out-Null
 }
 
@@ -2714,7 +2790,7 @@ function Disable-SoundLiftBypass {
 }
 
 $BypassButton.Add_Click({ Invoke-SoundLiftBypass $true })
-$DeviceButton.Add_Click({
+function Open-SoundLiftDeviceSelector {
     $apoConfig = Get-ApoConfigDirectory
     $installDirectory = if ($apoConfig) { Split-Path $apoConfig -Parent } else { $null }
     $candidates = @()
@@ -2748,7 +2824,8 @@ $DeviceButton.Add_Click({
     } else {
         Show-SoundLiftMessage 'Az Equalizer APO eszközválasztó nem található.' 'Eszközök' 'OK' 'Warning' $window | Out-Null
     }
-})
+}
+$DeviceButton.Add_Click({ Open-SoundLiftDeviceSelector })
 
 function Play-TestTone([int]$frequency = 60, [double]$seconds = 1.5) {
     $sampleRate = 44100; $samples = [int]($sampleRate * $seconds); $stream = New-Object IO.MemoryStream; $writer = New-Object IO.BinaryWriter($stream)
@@ -3279,7 +3356,7 @@ $window.Add_ContentRendered({
         }
         Update-DeveloperControls
         Show-PostUpdateResult
-        if (-not $script:onboardingCompleted) { Show-FirstRunWizard }
+        if (-not $script:onboardingCompleted) { Show-FirstRunWizard } else { Test-AndOfferSoundLiftRepair }
         Complete-SoundLiftStartup
         Start-AsyncAppUpdateCheck
     } catch {
