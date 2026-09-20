@@ -92,7 +92,7 @@ foreach ($requiredControlFeature in @(
     if (-not $source.Contains($requiredControlFeature)) { throw "Missing V1.3.15 quick-control feature: $requiredControlFeature" }
 }
 foreach ($requiredCustomHotkeyFeature in @(
- 'version = 10',
+ 'version = 11',
  'modifiers=[int]$_.modifiers; key=[int]$_.key',
  "`$keyName -match '^D([0-9])`$'",
  'nativeModifiers = [uint32]([int]$binding.modifiers -bor 0x4000)',
@@ -121,7 +121,7 @@ foreach ($requiredTrayMeterFeature in @(
 foreach ($requiredProfileMixerFeature in @(
     'function Apply-ProfileLayout', 'function Show-ProfileOrderEditor', 'profileOrder = @(',
     'hiddenProfiles = @(', 'ProfileOrderButton', 'AppVolumeButton', 'ms-settings:apps-volume',
-    "version = 10", "@('Music') +", 'list.Height=250', 'toggle.Height=40'
+    "version = 11", "@('Music') +", 'list.Height=250', 'toggle.Height=40'
 )) {
     if (-not $source.Contains($requiredProfileMixerFeature)) { throw "Missing V1.3.25 profile order or app volume behavior: $requiredProfileMixerFeature" }
 }
