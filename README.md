@@ -1,10 +1,10 @@
-# SoundLift V1.6.4
+# SoundLift V1.6.5
 
 Modern Windows-hangvezérlő profilokkal, basszuskiemeléssel, tízsávos
 equalizerrel és akár 300%-os hangerő-erősítéssel.
 
 A FiveM-profilok egyértelműen FiveM RP és FiveM PvP néven jelennek meg.
-Nyolc választható sötét megjelenés érhető el, köztük az OLED fekete téma.
+Tizennégy gyári megjelenés és egy teljesen személyre szabható téma érhető el.
 Minden fő- és felugró ablak egységesen követi a kiválasztott témát, automatikus kontrasztvédelemmel.
 
 Az egyedi SoundLift ikon az ablakban, a tálcán és a Windowssal

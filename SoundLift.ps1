@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.6.4'
+$script:appVersion = '1.6.5'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -67,6 +67,15 @@ $script:discordLinkGraceHours = 720
 $script:loggerInitialized = $false
 $script:startupCompleted = $false
 $script:themeName = 'Fekete és piros'
+$script:customTheme = @{ Main='#8B5CF6'; Background='#070B14'; Accent='#22D3EE' }
+
+function Get-SoundLiftContrastColor([string]$color) {
+    try {
+        $value = $color.TrimStart('#')
+        $r = [Convert]::ToInt32($value.Substring(0,2),16); $g = [Convert]::ToInt32($value.Substring(2,2),16); $b = [Convert]::ToInt32($value.Substring(4,2),16)
+        return $(if ((0.299*$r + 0.587*$g + 0.114*$b) -gt 155) { '#111318' } else { '#FFFFFF' })
+    } catch { return '#FFFFFF' }
+}
 
 function Get-SoundLiftThemePalette([string]$themeName = $script:themeName) {
     $theme = switch ($themeName) {
@@ -77,6 +86,13 @@ function Get-SoundLiftThemePalette([string]$themeName = $script:themeName) {
         'Grafit és narancs' { @{ Accent='#FB923C'; AccentDark='#C2410C'; Page='#241307'; Hover='#422414'; Contrast='#111113' } }
         'Fekete és arany'   { @{ Accent='#FACC55'; AccentDark='#A16207'; Page='#211804'; Hover='#3B2D10'; Contrast='#111113' } }
         'OLED fekete'       { @{ Accent='#F8FAFC'; AccentDark='#64748B'; Page='#000000'; Hover='#202024'; Base='#000000'; Surface='#070709'; SurfaceAlt='#000000'; Control='#111114'; Border='#303038'; Contrast='#09090B' } }
+        'Midnight Blue'     { @{ Accent='#60A5FA'; AccentDark='#2563EB'; Page='#071A33'; Hover='#102E54'; Base='#030A16'; Surface='#091426'; SurfaceAlt='#06101F'; Control='#10213A'; Border='#244466' } }
+        'Purple Neon'       { @{ Accent='#C084FC'; AccentDark='#7C3AED'; Page='#1A0928'; Hover='#32154A'; Base='#07040B'; Surface='#130B1C'; SurfaceAlt='#0D0714'; Control='#21122F'; Border='#4C2868' } }
+        'Cyberpunk'         { @{ Accent='#22D3EE'; AccentDark='#A855F7'; Page='#10142C'; Hover='#212650'; Base='#050611'; Surface='#101126'; SurfaceAlt='#090A19'; Control='#181A35'; Border='#3B3F72' } }
+        'Emerald'           { @{ Accent='#34D399'; AccentDark='#059669'; Page='#06251A'; Hover='#123C2C'; Base='#030A08'; Surface='#091A14'; SurfaceAlt='#06120E'; Control='#102A20'; Border='#235A43' } }
+        'Arctic'            { @{ Accent='#2563EB'; AccentDark='#1D4ED8'; Page='#DCEAF7'; Hover='#D6E5F5'; Base='#F4F8FC'; Surface='#FFFFFF'; SurfaceAlt='#EAF2F9'; Control='#E1ECF6'; Border='#A8BED3'; Primary='#172033'; Secondary='#334155'; Muted='#64748B'; Section='#475569'; Contrast='#FFFFFF'; IsLight=$true } }
+        'R6 Siege'          { @{ Accent='#FACC15'; AccentDark='#CA8A04'; Page='#1C1C16'; Hover='#343326'; Base='#080909'; Surface='#151616'; SurfaceAlt='#0E0F0F'; Control='#242525'; Border='#4B4B3A'; Contrast='#111318' } }
+        'Egyéni téma'       { $customText=Get-SoundLiftContrastColor $script:customTheme.Background; @{ Accent=$script:customTheme.Main; AccentDark=$script:customTheme.Accent; Page=$script:customTheme.Background; Hover=$script:customTheme.Background; Base=$script:customTheme.Background; Surface=$script:customTheme.Background; SurfaceAlt=$script:customTheme.Background; Control=$script:customTheme.Background; Border=$script:customTheme.Accent; Primary=$customText; Secondary=$customText; Muted=$customText; Section=$customText; Contrast=(Get-SoundLiftContrastColor $script:customTheme.Main); IsLight=($customText -eq '#111318') } }
         default             { @{ Accent='#FF4D67'; AccentDark='#A60024'; Page='#220A10'; Hover='#40131C' } }
     }
     return @{
@@ -86,6 +102,7 @@ function Get-SoundLiftThemePalette([string]$themeName = $script:themeName) {
         Border=$(if($theme.Border){$theme.Border}else{'#303038'}); Primary=$(if($theme.Primary){$theme.Primary}else{'#F8FAFC'})
         Secondary=$(if($theme.Secondary){$theme.Secondary}else{'#D4D9E2'}); Muted=$(if($theme.Muted){$theme.Muted}else{'#8B96A8'})
         Section=$(if($theme.Section){$theme.Section}else{'#AEB7C6'}); Contrast=$(if($theme.Contrast){$theme.Contrast}else{'#FFFFFF'})
+        IsLight=[bool]$theme.IsLight
         Success='#4ADE80'; Warning='#FBBF24'; Danger='#FB7185'
     }
 }
@@ -95,6 +112,9 @@ function Get-SoundLiftSavedThemeName {
         $earlySettingsPath = Join-Path $env:APPDATA 'SoundLift\settings.json'
         if (Test-Path -LiteralPath $earlySettingsPath) {
             $saved = Get-Content -LiteralPath $earlySettingsPath -Raw | ConvertFrom-Json
+            if ($saved.customTheme) {
+                foreach ($key in @('Main','Background','Accent')) { if ([string]$saved.customTheme.$key -match '^#[0-9A-Fa-f]{6}$') { $script:customTheme[$key] = [string]$saved.customTheme.$key } }
+            }
             $name = [string]$saved.theme
             $normalized = switch ($name) { 'Black & Red' {'Fekete és piros'} 'Black & Blue' {'Fekete és kék'} 'Graphite & Green' {'Grafit és zöld'} 'Világos' {'Fekete és piros'} default { if($name){$name}else{'Fekete és piros'} } }
             return $normalized
@@ -153,7 +173,8 @@ function Set-SoundLiftWindowStyle([Windows.Window]$targetWindow) {
     if ($targetWindow.Height -gt 0) { $targetWindow.MinHeight=[Math]::Min($targetWindow.Height,220) }
     $targetWindow.MaxHeight=[Windows.SystemParameters]::WorkArea.Height-32; $targetWindow.MaxWidth=[Windows.SystemParameters]::WorkArea.Width-32
     $themeIconPath=Join-Path $script:appDirectory 'SoundLift.ico';if(Test-Path -LiteralPath $themeIconPath){try{$targetWindow.Icon=[Windows.Media.Imaging.BitmapFrame]::Create([Uri]$themeIconPath)}catch{}}
-    $targetWindow.Add_SourceInitialized({try{$handle=[Windows.Interop.WindowInteropHelper]::new($targetWindow).Handle;$dark=1;[void][AudioAppNative]::DwmSetWindowAttribute($handle,20,[ref]$dark,4)}catch{}}.GetNewClosure())
+    $useDarkTitle = $(if($palette.IsLight){0}else{1})
+    $targetWindow.Add_SourceInitialized({try{$handle=[Windows.Interop.WindowInteropHelper]::new($targetWindow).Handle;$dark=$useDarkTitle;[void][AudioAppNative]::DwmSetWindowAttribute($handle,20,[ref]$dark,4)}catch{}}.GetNewClosure())
     $targetWindow.Add_ContentRendered({ Set-SoundLiftElementTheme $targetWindow.Content (Get-SoundLiftThemePalette) }.GetNewClosure())
 }
 
@@ -802,7 +823,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.6.4" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
+        Title="SoundLift V1.6.5" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -972,7 +993,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.6.4" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.6.5" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="15" Padding="17,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
         <StackPanel>
@@ -1059,7 +1080,8 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.6.4" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
+            <Button Name="CustomThemeButton" Content="✎   Egyéni téma szerkesztése" Style="{StaticResource UtilityButton}" Margin="0,0,0,9" Visibility="Collapsed"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.6.5" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,5,0,4"/>
@@ -1250,9 +1272,9 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.6.4'
+$script:trayIcon.Text = 'SoundLift V1.6.5'
 $script:trayIcon.Visible = $true
-$names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
+$names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','CustomThemeButton','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
 $VolumeSlider.ToolTip = 'A teljes hangerő erősítése 0 és 300% között.'
 $BassSlider.ToolTip = 'A mélyhangok kiemelése. Nagy értéknél használd a torzításvédelmet.'
@@ -1322,7 +1344,7 @@ function Set-AppTheme([string]$themeName) {
     foreach ($label in $script:eqValueLabels) { $label.Foreground = $window.Resources['AccentTextBrush'] }
     foreach ($label in $script:eqBandLabels) { $label.Foreground = $window.Resources['MutedTextBrush'] }
     $window.Foreground = $window.Resources['PrimaryTextBrush']
-    foreach ($control in @($MusicButton,$GameButton,$CombatButton,$R6Button,$DiscordButton,$MovieButton,$HeavyButton,$ResetButton,$ExtraBassProButton,$VoiceBoostButton,$CustomPresetXButton,$ProfileOrderButton,$CopySupportIdButton,$LicenseButton,$AboutButton,$PrivacyButton,$SaveButton,$LoadButton,$ExportButton,$ImportButton,$UndoButton,$TestButton,$DeviceButton,$AppVolumeButton,$MicrophoneButton,$DiagnosticsButton,$RepairApoButton,$ReportProblemButton,$UpdateButton,$RollbackButton,$OwnerModeButton,$ChangelogButton,$HotkeyButton,$StatisticsButton,$DeveloperConsoleButton)) {
+    foreach ($control in @($MusicButton,$GameButton,$CombatButton,$R6Button,$DiscordButton,$MovieButton,$HeavyButton,$ResetButton,$ExtraBassProButton,$VoiceBoostButton,$CustomPresetXButton,$ProfileOrderButton,$CustomThemeButton,$CopySupportIdButton,$LicenseButton,$AboutButton,$PrivacyButton,$SaveButton,$LoadButton,$ExportButton,$ImportButton,$UndoButton,$TestButton,$DeviceButton,$AppVolumeButton,$MicrophoneButton,$DiagnosticsButton,$RepairApoButton,$ReportProblemButton,$UpdateButton,$RollbackButton,$OwnerModeButton,$ChangelogButton,$HotkeyButton,$StatisticsButton,$DeveloperConsoleButton)) {
         if ($control) { $control.Foreground = $window.Resources['PrimaryTextBrush'] }
     }
     foreach ($checkBox in @($SafetyCheck,$AutoProfileCheck,$InstantCheck,$StartupCheck,$DoNotDisturbCheck,$NightModeCheck,$OverlayCheck,$DiscordPresenceCheck)) { if ($checkBox) { $checkBox.Foreground = $window.Resources['SecondaryTextBrush'] } }
@@ -1330,18 +1352,46 @@ function Set-AppTheme([string]$themeName) {
     $VersionText.Foreground = $window.Resources['MutedTextBrush']; $SupportIdText.Foreground = $window.Resources['MutedTextBrush']; $LicenseStatusText.Foreground = $window.Resources['MutedTextBrush']
     $ApplyButton.Foreground = $window.Resources['AccentContrastBrush']
     $script:themeName = $themeName
+    if ($CustomThemeButton) { $CustomThemeButton.Visibility = $(if($themeName -eq 'Egyéni téma'){'Visible'}else{'Collapsed'}) }
+    try { $handle=[Windows.Interop.WindowInteropHelper]::new($window).Handle; $dark=$(if($theme.IsLight){0}else{1}); [void][AudioAppNative]::DwmSetWindowAttribute($handle,20,[ref]$dark,4) } catch { }
+}
+
+function Show-SoundLiftCustomThemeEditor {
+    $palette = Get-SoundLiftThemePalette
+    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Egyéni téma';$dialog.Width=590;$dialog.Height=455;$dialog.ResizeMode='NoResize';$dialog.Owner=$window;Set-SoundLiftWindowStyle $dialog
+    $root=[Windows.Controls.Grid]::new();$root.Margin=[Windows.Thickness]::new(28)
+    $root.RowDefinitions.Add([Windows.Controls.RowDefinition]::new());$actionsRow=[Windows.Controls.RowDefinition]::new();$actionsRow.Height=[Windows.GridLength]::Auto;$root.RowDefinitions.Add($actionsRow)
+    $content=[Windows.Controls.StackPanel]::new();$title=[Windows.Controls.TextBlock]::new();$title.Text='Egyéni téma';$title.FontSize=25;$title.FontWeight='Bold';$title.Foreground=New-SoundLiftBrush $palette.Accent
+    $info=[Windows.Controls.TextBlock]::new();$info.Text='Válassz három színt. A SoundLift automatikusan jól olvasható szövegszínt használ a gombokon.';$info.TextWrapping='Wrap';$info.FontSize=13;$info.LineHeight=20;$info.Foreground=New-SoundLiftBrush $palette.Secondary;$info.Margin=[Windows.Thickness]::new(0,6,0,20)
+    [void]$content.Children.Add($title);[void]$content.Children.Add($info)
+    $fields=@{}
+    foreach($item in @(@('Main','Főszín',$script:customTheme.Main),@('Background','Háttérszín',$script:customTheme.Background),@('Accent','Kiemelőszín',$script:customTheme.Accent))){
+        $line=[Windows.Controls.Grid]::new();$line.Margin=[Windows.Thickness]::new(0,0,0,12);$line.ColumnDefinitions.Add([Windows.Controls.ColumnDefinition]::new());$inputColumn=[Windows.Controls.ColumnDefinition]::new();$inputColumn.Width=[Windows.GridLength]::new(165);$line.ColumnDefinitions.Add($inputColumn);$buttonColumn=[Windows.Controls.ColumnDefinition]::new();$buttonColumn.Width=[Windows.GridLength]::new(125);$line.ColumnDefinitions.Add($buttonColumn)
+        $label=[Windows.Controls.TextBlock]::new();$label.Text=$item[1];$label.VerticalAlignment='Center';$label.FontSize=14;$label.Foreground=New-SoundLiftBrush $palette.Primary
+        $input=[Windows.Controls.TextBox]::new();$input.Text=$item[2];$input.Height=38;$input.Padding=[Windows.Thickness]::new(10,7,10,7);$input.Margin=[Windows.Thickness]::new(12,0,10,0);[Windows.Controls.Grid]::SetColumn($input,1)
+        $choose=[Windows.Controls.Button]::new();$choose.Content='Szín kiválasztása';$choose.Height=38;$choose.Tag=$input;[Windows.Controls.Grid]::SetColumn($choose,2)
+        $choose.Add_Click({$target=[Windows.Controls.TextBox]$this.Tag;$picker=[Windows.Forms.ColorDialog]::new();try{$picker.Color=[Drawing.ColorTranslator]::FromHtml($target.Text)}catch{};if($picker.ShowDialog()-eq [Windows.Forms.DialogResult]::OK){$target.Text=('#{0:X2}{1:X2}{2:X2}' -f $picker.Color.R,$picker.Color.G,$picker.Color.B)};$picker.Dispose()})
+        [void]$line.Children.Add($label);[void]$line.Children.Add($input);[void]$line.Children.Add($choose);[void]$content.Children.Add($line);$fields[$item[0]]=$input
+    }
+    [void]$root.Children.Add($content)
+    $actions=[Windows.Controls.StackPanel]::new();$actions.Orientation='Horizontal';$actions.HorizontalAlignment='Right';$actions.Margin=[Windows.Thickness]::new(0,20,0,0);[Windows.Controls.Grid]::SetRow($actions,1)
+    $cancel=[Windows.Controls.Button]::new();$cancel.Content='Mégse';$cancel.Width=110;$cancel.Margin=[Windows.Thickness]::new(0,0,10,0);$cancel.Tag=$dialog;$cancel.Add_Click({$this.Tag.Close()})
+    $save=[Windows.Controls.Button]::new();$save.Content='Mentés';$save.Width=125;$save.Tag=[PSCustomObject]@{Dialog=$dialog;Main=$fields.Main;Background=$fields.Background;Accent=$fields.Accent};$save.Add_Click({$ctx=$this.Tag;$values=@{Main=[string]$ctx.Main.Text;Background=[string]$ctx.Background.Text;Accent=[string]$ctx.Accent.Text};foreach($value in $values.Values){if($value -notmatch '^#[0-9A-Fa-f]{6}$'){Show-SoundLiftMessage 'A színeket #RRGGBB formában add meg, például: #22D3EE.' 'Hibás színkód' 'OK' 'Warning' $ctx.Dialog|Out-Null;return}};$script:customTheme=$values;Set-AppTheme 'Egyéni téma';try{(Get-AppState)|ConvertTo-Json -Depth 5|Set-Content -LiteralPath $settingsPath -Encoding UTF8}catch{};$ctx.Dialog.DialogResult=$true})
+    [void]$actions.Children.Add($cancel);[void]$actions.Children.Add($save);[void]$root.Children.Add($actions);$dialog.Content=$root;[void]$dialog.ShowDialog()
 }
 
 $script:themeNames = @(
     'Fekete és piros', 'Fekete és kék', 'Grafit és zöld',
     'Fekete és lila', 'Éjkék és türkiz', 'Grafit és narancs',
-    'Fekete és arany', 'OLED fekete'
+    'Fekete és arany', 'OLED fekete', 'Midnight Blue', 'Purple Neon',
+    'Cyberpunk', 'Emerald', 'Arctic', 'R6 Siege', 'Egyéni téma'
 )
 foreach ($themeName in $script:themeNames) { [void]$ThemeCombo.Items.Add($themeName) }
 $ThemeCombo.SelectedItem = $script:themeName
 $ThemeCombo.Add_SelectionChanged({
     if ($ThemeCombo.SelectedItem) { Set-AppTheme ([string]$ThemeCombo.SelectedItem) }
 })
+$CustomThemeButton.Add_Click({ Show-SoundLiftCustomThemeEditor })
 Set-AppTheme $script:themeName
 
 function Set-EqValues([double[]]$values) {
@@ -1603,7 +1653,8 @@ function Invoke-ApplyButton {
 
 function Get-AppState {
     return [PSCustomObject]@{
-        version = 10; profile = $script:activeProfile; theme = $script:themeName
+        version = 11; profile = $script:activeProfile; theme = $script:themeName
+        customTheme = [PSCustomObject]@{ Main=$script:customTheme.Main; Background=$script:customTheme.Background; Accent=$script:customTheme.Accent }
         onboardingCompleted = [bool]$script:onboardingCompleted
         volume = [int]$VolumeSlider.Value; bass = [int]$BassSlider.Value; frequency = [int]$FrequencySlider.Value
         safety = [bool]$SafetyCheck.IsChecked; autoProfile = $false; instant = [bool]$InstantCheck.IsChecked
@@ -1620,6 +1671,9 @@ function Get-AppState {
 
 function Set-AppState($state) {
     if (-not $state) { return }
+    if ($state.customTheme) {
+        foreach ($key in @('Main','Background','Accent')) { if ([string]$state.customTheme.$key -match '^#[0-9A-Fa-f]{6}$') { $script:customTheme[$key]=[string]$state.customTheme.$key } }
+    }
     $script:activeProfile = if ($state.profile) { [string]$state.profile } else { 'Custom' }
     Set-Profile ([int]$state.volume) ([int]$state.bass) ([int]$state.frequency) ([bool]$state.safety)
     if ($state.eq -and $state.eq.Count -eq 10) { Set-EqValues ([double[]]$state.eq) }
@@ -2412,6 +2466,11 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.6.5 – ÚJ TÉMÁK ÉS TÉMASZERKESZTŐ
+• Hat új gyári téma: Midnight Blue, Purple Neon, Cyberpunk, Emerald, Arctic és R6 Siege.
+• Az Egyéni témában külön megadható a főszín, a háttérszín és a kiemelőszín.
+• Az egyéni színek automatikusan mentődnek, a szövegkontraszt és a címsor megjelenése pedig világos háttérnél is olvasható marad.
+
 V1.6.4 – LETISZTULT MIKROFONABLAK
 • A hosszú Shadow-figyelmeztetés kikerült a mikrofonablakból, így a felület ismét rövid és átlátható.
 
