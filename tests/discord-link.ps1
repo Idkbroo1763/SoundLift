@@ -148,7 +148,7 @@ foreach ($requiredCleanupBehavior in @('Remove-SoundLiftInclude', "Join-Path `$e
     if (-not $uninstallerSource.Contains($requiredCleanupBehavior)) { throw "Missing clean uninstall behavior: $requiredCleanupBehavior" }
 }
 if (-not $source.Contains("`$script:discordLinkGraceHours = 720")) { throw 'Offline grace period is not 30 days' }
-foreach ($requiredThemeMarker in @('#C084FC','#22D3EE','#FB923C','#FACC55','OLED fekete','Midnight Blue','Purple Neon','Cyberpunk','Emerald','Arctic','R6 Siege','Egyéni téma','Show-SoundLiftCustomThemeEditor','Get-SoundLiftContrastColor')) {
+foreach ($requiredThemeMarker in @('#C084FC','#22D3EE','#FB923C','#FACC55','OLED fekete','Midnight Blue','Purple Neon','Cyberpunk','Emerald','Arctic','R6 Siege','CustomThemeButton','Show-SoundLiftCustomThemeEditor','Get-SoundLiftContrastColor')) {
     if (-not $source.Contains($requiredThemeMarker)) { throw "Missing SoundLift theme marker: $requiredThemeMarker" }
 }
 foreach ($requiredUiFix in @(
