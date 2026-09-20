@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.6.5'
+$script:appVersion = '1.6.6'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -823,7 +823,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.6.5" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
+        Title="SoundLift V1.6.6" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -993,7 +993,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.6.5" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.6.6" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="15" Padding="17,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
         <StackPanel>
@@ -1081,7 +1081,7 @@ $xaml = @'
               </ComboBox.Resources>
             </ComboBox>
             <Button Name="CustomThemeButton" Content="✎   Egyéni téma szerkesztése" Style="{StaticResource UtilityButton}" Margin="0,0,0,9" Visibility="Collapsed"/>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.6.5" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.6.6" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,5,0,4"/>
@@ -1272,7 +1272,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.6.5'
+$script:trayIcon.Text = 'SoundLift V1.6.6'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','CustomThemeButton','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -1340,7 +1340,10 @@ function Set-AppTheme([string]$themeName) {
     $window.Resources['AccentTextBrush'] = [Windows.Media.SolidColorBrush]::new($accentColor)
     $window.Resources['HoverBrush'] = [Windows.Media.SolidColorBrush]::new([Windows.Media.ColorConverter]::ConvertFromString($theme.Hover))
     $palette = $theme
-    foreach($entry in $palette.GetEnumerator()) { $window.Resources[($entry.Key + 'Brush')] = [Windows.Media.SolidColorBrush]::new([Windows.Media.ColorConverter]::ConvertFromString([string]$entry.Value)) }
+    foreach($entry in $palette.GetEnumerator()) {
+        if ($entry.Key -eq 'IsLight') { continue }
+        $window.Resources[($entry.Key + 'Brush')] = [Windows.Media.SolidColorBrush]::new([Windows.Media.ColorConverter]::ConvertFromString([string]$entry.Value))
+    }
     foreach ($label in $script:eqValueLabels) { $label.Foreground = $window.Resources['AccentTextBrush'] }
     foreach ($label in $script:eqBandLabels) { $label.Foreground = $window.Resources['MutedTextBrush'] }
     $window.Foreground = $window.Resources['PrimaryTextBrush']
@@ -1386,13 +1389,17 @@ $script:themeNames = @(
     'Fekete és arany', 'OLED fekete', 'Midnight Blue', 'Purple Neon',
     'Cyberpunk', 'Emerald', 'Arctic', 'R6 Siege', 'Egyéni téma'
 )
-foreach ($themeName in $script:themeNames) { [void]$ThemeCombo.Items.Add($themeName) }
+foreach ($themeOptionName in $script:themeNames) { [void]$ThemeCombo.Items.Add($themeOptionName) }
+if ($script:themeNames -notcontains $script:themeName) { $script:themeName = 'Fekete és piros' }
 $ThemeCombo.SelectedItem = $script:themeName
 $ThemeCombo.Add_SelectionChanged({
-    if ($ThemeCombo.SelectedItem) { Set-AppTheme ([string]$ThemeCombo.SelectedItem) }
+    if ($ThemeCombo.SelectedItem) {
+        try { Set-AppTheme ([string]$ThemeCombo.SelectedItem) }
+        catch { $script:themeName='Fekete és piros';$ThemeCombo.SelectedItem='Fekete és piros';Set-AppTheme 'Fekete és piros' }
+    }
 })
 $CustomThemeButton.Add_Click({ Show-SoundLiftCustomThemeEditor })
-Set-AppTheme $script:themeName
+try { Set-AppTheme $script:themeName } catch { $script:themeName='Fekete és piros';$ThemeCombo.SelectedItem='Fekete és piros';Set-AppTheme 'Fekete és piros' }
 
 function Set-EqValues([double[]]$values) {
     for ($i = 0; $i -lt $script:eqSliders.Count; $i++) { $script:eqSliders[$i].Value = $values[$i] }
@@ -2466,6 +2473,11 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.6.6 – INDÍTÁSI GYORSJAVÍTÁS
+• Javítva az új témák feldolgozása közben fellépő FormatException, amely miatt a v1.6.5 az engedélykérés után bezárult.
+• A témalista már nem írja felül induláskor a mentett témát.
+• Hibás vagy sérült témabeállítás esetén a SoundLift biztonságosan visszaáll a Fekete és piros témára.
+
 V1.6.5 – ÚJ TÉMÁK ÉS TÉMASZERKESZTŐ
 • Hat új gyári téma: Midnight Blue, Purple Neon, Cyberpunk, Emerald, Arctic és R6 Siege.
 • Az Egyéni témában külön megadható a főszín, a háttérszín és a kiemelőszín.
