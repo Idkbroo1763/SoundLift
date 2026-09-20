@@ -39,12 +39,26 @@ Deno.serve(async (request) => {
       const { data:feature,error:featureError } = await supabase.from("soundlift_features").select("id").eq("feature_key",featureKey).eq("active",true).maybeSingle();
       if (featureError) throw featureError;
       if (!feature) return reply(404,{ok:false,code:"FEATURE_NOT_FOUND"});
+      const { data:license,error:licenseError } = await supabase.from("licenses").select("license_type,customer_name,status").eq("id",licenseId).maybeSingle();
+      if (licenseError) throw licenseError;
+      if (!license) return reply(404,{ok:false,code:"LICENSE_NOT_FOUND"});
       const enabled = body.enabled !== false;
       const config = body.config && typeof body.config === "object" && !Array.isArray(body.config) ? body.config : {};
       const { error } = await supabase.from("soundlift_license_features").upsert({license_id:licenseId,feature_id:feature.id,enabled,config},{onConflict:"license_id,feature_id"});
       if (error) throw error;
-      await storeAndForwardEvent(supabase,{category:"license",event_name:"license_feature_changed",severity:"warning",source:"admin",trusted:true,metadata:{license_ref:licenseId,feature_key:featureKey,enabled}});
+      await storeAndForwardEvent(supabase,{category:"license",event_name:"license_feature_changed",severity:"warning",source:"admin",trusted:true,metadata:{license_ref:licenseId,license_type:license.license_type,license_variant:license.license_type === "developer" ? "fejlesztői" : "egyedi",customer_build:String(license.customer_name ?? "általános").slice(0,80),license_status:license.status,feature_key:featureKey,feature_permission:enabled ? "engedélyezve" : "letiltva"}});
       return reply(200,{ok:true});
+    }
+    if (action === "set_status") {
+      const status = String(body.status ?? "").trim().toLowerCase();
+      if (!licensePattern.test(licenseId) || !["active","suspended","revoked"].includes(status) || reason.length < 3) return reply(400,{ok:false,code:"INVALID_REQUEST"});
+      const { data:license,error:readError } = await supabase.from("licenses").select("license_type,status,customer_name").eq("id",licenseId).maybeSingle();
+      if (readError) throw readError;
+      if (!license) return reply(404,{ok:false,code:"LICENSE_NOT_FOUND"});
+      const { error } = await supabase.from("licenses").update({status}).eq("id",licenseId);
+      if (error) throw error;
+      await storeAndForwardEvent(supabase,{category:"license",event_name:"license_status_changed",severity:status === "active" ? "info" : "critical",source:"admin",trusted:true,metadata:{license_ref:licenseId,license_type:license.license_type,license_variant:license.license_type === "developer" ? "fejlesztői" : "normál/egyedi",customer_build:String(license.customer_name ?? "általános").slice(0,80),previous_status:license.status,license_status:status,reason}});
+      return reply(200,{ok:true,status});
     }
     if (action === "set_owner") {
       if (!licensePattern.test(licenseId) || typeof body.enabled !== "boolean") return reply(400,{ok:false,code:"INVALID_REQUEST"});
