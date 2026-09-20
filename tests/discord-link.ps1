@@ -35,8 +35,8 @@ foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoIn
 }
 foreach ($requiredRepairAndOnboardingFeature in @(
     'function Get-SoundLiftApoHealth', 'SOUNDLIFT_CONFIG_INVALID', 'automatic_repair_result',
-    'function Test-AndOfferSoundLiftRepair', 'Ellenőrzés és automatikus javítás',
-    'Hangeszköz kiválasztása', 'Teszt hang lejátszása', 'Ajánlott kezdőprofil',
+    'function Test-AndOfferSoundLiftRepair', 'Repair-SoundLiftApoInclude -Automatic',
+    'function Open-SoundLiftDeviceSelector', 'Play-TestTone 60 1.5', 'Profile=$true',
     'function Open-SoundLiftDeviceSelector', 'Show-FirstRunWizard } else { Test-AndOfferSoundLiftRepair }'
 )) {
     if (-not $source.Contains($requiredRepairAndOnboardingFeature)) { throw "Missing V1.6.0 repair or onboarding feature: $requiredRepairAndOnboardingFeature" }
