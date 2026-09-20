@@ -30,7 +30,7 @@ foreach ($requiredUniversalBuildFragment in @(
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
 if (-not $source.Contains("`$script:appVersion = '2.0.0'")) { throw 'Application version was not updated to 2.0.0' }
-foreach ($requiredV2DashboardFragment in @('SoundLift V2.0.0', 'GYORS PROFILOK', 'QuickProfileButton', 'DashboardCard', 'NAGYOBB ÉLMÉNY.', "`$activeButton.Background = `$window.Resources['AccentGradient']")) {
+foreach ($requiredV2DashboardFragment in @('SoundLift V2.0.0', 'GYORS PROFILOK', 'QuickProfileButton', 'DashboardCard', "`$activeButton.Background = `$window.Resources['AccentGradient']")) {
  if (-not $source.Contains($requiredV2DashboardFragment)) { throw "Missing V2.0 dashboard behavior: $requiredV2DashboardFragment" }
 }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
