@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.6.0'
+$script:appVersion = '1.6.1'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -796,7 +796,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.6.0" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
+        Title="SoundLift V1.6.1" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -966,7 +966,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.6.0" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.6.1" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="15" Padding="17,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
         <StackPanel>
@@ -1053,7 +1053,7 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.6.0" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.6.1" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,5,0,4"/>
@@ -1244,7 +1244,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.6.0'
+$script:trayIcon.Text = 'SoundLift V1.6.1'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -2406,6 +2406,11 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.6.1 – BILLENTYŰPARANCS-MENTÉS JAVÍTÁSA
+• A Mégse és Mentés gomb most teljesen azonos méretű.
+• A Mentés gomb megbízhatóan elmenti és azonnal újraregisztrálja a beállított billentyűparancsokat.
+• Sikertelen mentéskor az ablak nyitva marad, és érthető hibaüzenetet jelenít meg.
+
 V1.6.0 – BEÁLLÍTÓVARÁZSLÓ, AUTOMATIKUS JAVÍTÁS ÉS LICENCKEZELŐ
 • Az első indítás varázslója ellenőrzi és javítja az APO-kapcsolatot, megnyitja a hangeszközválasztót, hangtesztet futtat és kezdőprofilt alkalmaz.
 • Az automatikus javítás felismeri a hiányzó Include sort, valamint a hiányzó, sérült vagy olvashatatlan SoundLift-konfigurációt, és biztonsági mentéssel állítja helyre.
@@ -3184,19 +3189,31 @@ function Show-HotkeyEditor {
         [void]$right.Children.Add($capture);[void]$right.Children.Add($clear);[Windows.Controls.DockPanel]::SetDock($right,'Right'); [void]$row.Children.Add($right); [void]$row.Children.Add($label); [void]$panel.Children.Add($row); $selectors += $capture
     }
     $buttons=[Windows.Controls.StackPanel]::new(); $buttons.Orientation='Horizontal'; $buttons.HorizontalAlignment='Right'; $buttons.Margin=[Windows.Thickness]::new(0,14,0,0)
-    $cancel=[Windows.Controls.Button]::new(); $cancel.Content='Mégse'; $cancel.Width=100; $cancel.Margin=[Windows.Thickness]::new(0,0,10,0); $cancel.Style=$window.Resources['UtilityButton']
-    $save=[Windows.Controls.Button]::new(); $save.Content='Mentés'; $save.Width=120; $save.Style=$window.Resources['PrimaryButton']
+    $cancel=[Windows.Controls.Button]::new(); $cancel.Content='Mégse'; $cancel.Width=112; $cancel.Height=42; $cancel.Margin=[Windows.Thickness]::new(0,0,10,0); $cancel.Style=$window.Resources['UtilityButton']
+    $save=[Windows.Controls.Button]::new(); $save.Content='Mentés'; $save.Width=112; $save.Height=42; $save.Style=$window.Resources['PrimaryButton']; $save.IsDefault=$true
     $cancel.Add_Click({$dialog.Close()}.GetNewClosure())
     $save.Add_Click({
+        $save.IsEnabled=$false
         $bindings=@($selectors|ForEach-Object{$_.Tag});$activeSignatures=@($bindings|Where-Object{[int]$_.key -ne 0}|ForEach-Object{"$($_.modifiers):$($_.key)"})
-        if ((@($activeSignatures|Select-Object -Unique)).Count -ne $activeSignatures.Count) { Show-SoundLiftMessage 'Ugyanaz a kombináció csak egy parancshoz használható.' 'Billentyűütközés' 'OK' 'Warning' $dialog|Out-Null; return }
+        if ((@($activeSignatures|Select-Object -Unique)).Count -ne $activeSignatures.Count) { Show-SoundLiftMessage 'Ugyanaz a kombináció csak egy parancshoz használható.' 'Billentyűütközés' 'OK' 'Warning' $dialog|Out-Null; $save.IsEnabled=$true; return }
         $singleKeys=@($bindings|Where-Object{[int]$_.key -ne 0 -and [int]$_.modifiers -eq 0})
         if($singleKeys.Count -gt 0){
             $answer=Show-SoundLiftMessage 'Önálló billentyűt is beállítottál. Ez gépelés és játék közben is aktiválhatja a hozzárendelt profilt. Biztosan mented?' 'Önálló gyorsbillentyű' 'YesNo' 'Warning' $dialog
-            if($answer -ne 'Yes'){return}
+            if($answer -ne 'Yes'){$save.IsEnabled=$true;return}
         }
         $previous=@($script:hotKeyBindings); $script:hotKeyBindings=@($bindings|ForEach-Object{[PSCustomObject]@{modifiers=[int]$_.modifiers;key=[int]$_.key}});$script:hotKeyVirtualKeys=@($script:hotKeyBindings|ForEach-Object{[int]$_.key})
-        try { Register-SoundLiftHotKeys; $dialog.Close(); $StatusText.Text='A billentyűparancsok mentve'; (Get-AppState)|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $settingsPath -Encoding UTF8 } catch { $script:hotKeyBindings=$previous; $script:hotKeyVirtualKeys=@($previous|ForEach-Object{[int]$_.key}); Register-SoundLiftHotKeys; Show-SoundLiftMessage $_.Exception.Message 'Billentyűütközés' 'OK' 'Warning' $dialog|Out-Null }
+        try {
+            Register-SoundLiftHotKeys
+            (Get-AppState)|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $settingsPath -Encoding UTF8
+            $StatusText.Text='A billentyűparancsok mentve'
+            $dialog.DialogResult=$true
+        } catch {
+            $saveError=$_.Exception.Message
+            $script:hotKeyBindings=$previous; $script:hotKeyVirtualKeys=@($previous|ForEach-Object{[int]$_.key})
+            try { Register-SoundLiftHotKeys } catch { }
+            $save.IsEnabled=$true
+            Show-SoundLiftMessage "A billentyűparancsok mentése nem sikerült.`n`n$saveError" 'Billentyűparancsok' 'OK' 'Warning' $dialog|Out-Null
+        }
     }.GetNewClosure())
     [void]$buttons.Children.Add($cancel); [void]$buttons.Children.Add($save); [Windows.Controls.Grid]::SetRow($buttons,1); [void]$root.Children.Add($panel); [void]$root.Children.Add($buttons); $dialog.Content=$root; $dialog.ShowDialog()|Out-Null
 }
