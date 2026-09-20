@@ -29,7 +29,7 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '1.6.2'")) { throw 'Application version was not updated to 1.6.2' }
+if (-not $source.Contains("`$script:appVersion = '1.6.3'")) { throw 'Application version was not updated to 1.6.3' }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
     if (-not $source.Contains("function $requiredFeature")) { throw "Missing required SoundLift feature: $requiredFeature" }
 }
@@ -48,7 +48,10 @@ foreach ($requiredGameAndMicrophoneFix in @(
     '$overlay.ShowActivated=$false', '$overlay.Focusable=$false',
     '-not $window.IsActive',
     'ERole.eConsole, ERole.eMultimedia, ERole.eCommunications',
-    'GetMasterVolumeLevelScalar(out confirmed)'
+    'GetMasterVolumeLevelScalar(out confirmed)',
+    'SetChannelVolumeLevelScalar(channel, target, ref context)',
+    "`$isShadowMicrophone=`$microphoneName -match 'Shadow Virtual Audio'",
+    'if($isShadowMicrophone){Show-SoundLiftMessage'
 )) {
     if (-not $source.Contains($requiredGameAndMicrophoneFix)) { throw "Missing game focus or microphone volume fix: $requiredGameAndMicrophoneFix" }
 }
@@ -212,7 +215,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='1.6.2'
+ $script:appVersion='1.6.3'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }
