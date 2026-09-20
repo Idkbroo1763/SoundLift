@@ -29,7 +29,7 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '1.4.7'")) { throw 'Application version was not updated to 1.4.7' }
+if (-not $source.Contains("`$script:appVersion = '1.5.0'")) { throw 'Application version was not updated to 1.5.0' }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
     if (-not $source.Contains("function $requiredFeature")) { throw "Missing required SoundLift feature: $requiredFeature" }
 }
@@ -56,6 +56,15 @@ foreach ($removedVisibleFeature in @(
 foreach ($requiredSimplifiedUi in @('Name="ProfileManagerButton"', "`$ProfileManagerButton.Add_Click", "`$windowsSoundItem = `$trayMenu.Items.Add", "Start-Process 'ms-settings:sound'")) {
     if (-not $source.Contains($requiredSimplifiedUi)) { throw "Missing simplified UI behavior: $requiredSimplifiedUi" }
 }
+foreach ($requiredModernUi in @(
+    'function Get-SoundLiftThemePalette', 'function Set-SoundLiftWindowStyle',
+    'function Set-SoundLiftElementTheme', 'function Show-SoundLiftMessage',
+    'Get-SoundLiftSavedThemeName', "`$dialog.Resources['AccentGradient']",
+    'TextWrapping=', 'PrimaryAction'
+)) {
+    if (-not $source.Contains($requiredModernUi)) { throw "Missing modern theme-aware UI behavior: $requiredModernUi" }
+}
+if ($source.Contains('[System.Windows.MessageBox]::Show')) { throw 'Legacy non-themed Windows message box is still present' }
 foreach ($requiredWindowsStartupFix in @(
     'function Test-SoundLiftStartupTask', 'function Enable-SoundLiftStartupTask',
     'New-ScheduledTaskTrigger -AtLogOn', 'New-ScheduledTaskPrincipal', '-RunLevel Highest',
@@ -192,7 +201,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='1.4.7'
+ $script:appVersion='1.5.0'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }
