@@ -18,6 +18,11 @@ async function sha256(value: string) {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+async function stableEventId(value: string) {
+  const hex = await sha256(value);
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-5${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20,32)}`;
+}
+
 Deno.serve(async (request) => {
   if (request.method !== "POST") return reply(405, { allowed: false, message: "Method not allowed." });
   const contentLength = Number.parseInt(request.headers.get("content-length") ?? "0", 10);
@@ -31,6 +36,8 @@ Deno.serve(async (request) => {
     const installationId = String(body.installation_id ?? "").trim().toLowerCase();
     const action = String(body.action ?? "verify");
     const simulationLicenseId = String(body.simulation_license_id ?? "").trim().toLowerCase();
+    const appVersion = String(body.app_version ?? "unknown").trim().slice(0,24);
+    const buildChannel = String(body.build_channel ?? "public").trim().toLowerCase().slice(0,24);
     if (!["verify","list_owner_targets"].includes(action) || licenseKey.length < 24 || licenseKey.length > 160 || !/^[a-f0-9]{64}$/.test(deviceId) || !/^[a-z0-9][a-z0-9_-]{2,63}$/.test(productId) || !uuidPattern.test(installationId)) {
       return reply(400, { allowed: false, code: "INVALID_REQUEST", message: "Érvénytelen licenckérés." });
     }
@@ -58,26 +65,22 @@ Deno.serve(async (request) => {
     const allowed = data?.allowed === true;
     const rejectedCode = String(data?.code ?? "UNKNOWN");
     const isSecurity = !allowed && ["INVALID_LICENSE", "LICENSE_BLOCKED", "LICENSE_EXPIRED", "DEVICE_LIMIT", "DISCORD_ACCOUNT_MISMATCH"].includes(rejectedCode);
-    const eventName = allowed ? String(data.activation_event ?? "validated") : "license_rejected";
-    await storeAndForwardEvent(supabase, {
-      category: data?.license_type === "developer" && allowed ? "developer_access" : isSecurity ? "security" : "license",
-      event_name: data?.license_type === "developer" && allowed ? "developer_license_authorized" : eventName,
-      severity: allowed ? (data?.license_type === "developer" ? "warning" : "info") : "warning",
-      product_id: productId,
-      installation_id: installationId,
-      source: "backend",
-      trusted: true,
-      metadata: {
-        support_id: `SL-${installationId.replaceAll("-", "").slice(0, 8).toUpperCase()}`,
-        discord_user: `<@${linkedUser.discord_user_id}>`,
-        discord_name: String(linkedUser.discord_global_name || linkedUser.discord_username || "ismeretlen").slice(0, 80),
-        code: rejectedCode,
-        license_type: data?.license_type ?? "unknown",
-        license_ref: data?.internal_license_id ?? `unknown-${keyHash.slice(0, 12)}`,
-        device_ref: deviceId.slice(0, 12),
-      },
-    });
     if (!allowed) {
+      const rejectedEvent = rejectedCode === "DEVICE_LIMIT" ? "device_change_rejected" : rejectedCode === "LICENSE_BLOCKED" ? "license_revoked_or_suspended" : "license_rejected";
+      await storeAndForwardEvent(supabase, {
+        category: isSecurity ? "security" : "license", event_name: rejectedEvent, severity: "warning",
+        app_version: appVersion, product_id: productId, installation_id: installationId, source: "backend", trusted: true,
+        metadata: {
+          support_id: `SL-${installationId.replaceAll("-", "").slice(0, 8).toUpperCase()}`,
+          discord_user: `<@${linkedUser.discord_user_id}>`, discord_name: String(linkedUser.discord_global_name || linkedUser.discord_username || "ismeretlen").slice(0,80),
+          code: rejectedCode, license_type: data?.license_type ?? "unknown",
+          license_variant: data?.license_type === "developer" ? "fejlesztői" : data?.license_type ? "normál/egyedi" : "ismeretlen",
+          license_status: data?.license_status ?? (rejectedCode === "LICENSE_BLOCKED" ? "revoked_or_suspended" : "unknown"),
+          license_ref: data?.internal_license_id ?? `unknown-${keyHash.slice(0,12)}`, device_ref: deviceId.slice(0,12),
+          customer_build: String(data?.customer_name ?? "általános").slice(0,80), build_channel: buildChannel,
+          server_check: "online", machine_binding: rejectedCode === "DEVICE_LIMIT" ? "other_device" : "unchanged",
+        },
+      });
       const publicData = { ...data };
       delete publicData.internal_license_id;
       delete publicData.activation_event;
@@ -126,7 +129,26 @@ Deno.serve(async (request) => {
 
     const { data: features, error: featureError } = await supabase.rpc("get_soundlift_license_features", { p_license_id:entitlementLicenseId });
     if (featureError) throw featureError;
-    const publicData = { ...data, is_owner:isOwner, features:features ?? [], simulated_license:simulatedLicense };
+    const enabledFeatures = (features ?? []).filter((item:any) => item.enabled !== false).map((item:any) => String(item.feature_key)).sort();
+    const licenseVariant = data.license_type === "developer" ? "fejlesztői" : enabledFeatures.length ? "egyedi" : "normál";
+    const activationEvent = String(data.activation_event ?? "validated");
+    const logEventName = data.license_type === "developer" ? "developer_license_authorized" : activationEvent === "device_attached_after_transfer" ? "device_changed" : activationEvent === "activated" ? "device_bound" : "license_validation_summary";
+    const eventId = activationEvent === "validated" ? await stableEventId(`${actualLicenseId}|${deviceId}|${new Date().toISOString().slice(0,10)}|${logEventName}`) : undefined;
+    await storeAndForwardEvent(supabase, {
+      event_id:eventId, category:data.license_type === "developer" ? "developer_access" : "license",
+      event_name:logEventName, severity:data.license_type === "developer" ? "warning" : "info",
+      app_version:appVersion, product_id:productId, installation_id:installationId, source:"backend", trusted:true,
+      metadata:{
+        support_id:`SL-${installationId.replaceAll("-","").slice(0,8).toUpperCase()}`,
+        discord_user:`<@${linkedUser.discord_user_id}>`, discord_name:String(linkedUser.discord_global_name || linkedUser.discord_username || "ismeretlen").slice(0,80),
+        license_ref:entitlementLicenseId, license_type:data.license_type ?? "customer", license_variant:licenseVariant,
+        license_status:data.license_status ?? "active", customer_build:String(data.customer_name ?? "általános").slice(0,80),
+        app_version:appVersion, build_channel:buildChannel, device_ref:deviceId.slice(0,12),
+        machine_binding:activationEvent === "device_attached_after_transfer" ? "changed" : activationEvent === "activated" ? "new_binding" : "unchanged",
+        server_check:"online", features_enabled:enabledFeatures.length ? enabledFeatures.join(", ") : "nincs",
+      },
+    });
+    const publicData = { ...data, is_owner:isOwner, features:features ?? [], license_variant:licenseVariant, simulated_license:simulatedLicense };
     delete publicData.internal_license_id;
     delete publicData.activation_event;
     return reply(200, publicData);
