@@ -29,7 +29,7 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '1.6.6'")) { throw 'Application version was not updated to 1.6.6' }
+if (-not $source.Contains("`$script:appVersion = '1.6.7'")) { throw 'Application version was not updated to 1.6.7' }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
     if (-not $source.Contains("function $requiredFeature")) { throw "Missing required SoundLift feature: $requiredFeature" }
 }
@@ -148,12 +148,13 @@ foreach ($requiredCleanupBehavior in @('Remove-SoundLiftInclude', "Join-Path `$e
     if (-not $uninstallerSource.Contains($requiredCleanupBehavior)) { throw "Missing clean uninstall behavior: $requiredCleanupBehavior" }
 }
 if (-not $source.Contains("`$script:discordLinkGraceHours = 720")) { throw 'Offline grace period is not 30 days' }
-foreach ($requiredThemeMarker in @('#C084FC','#22D3EE','#FB923C','#FACC55','OLED fekete','Midnight Blue','Purple Neon','Cyberpunk','Emerald','Arctic','R6 Siege','CustomThemeButton','Show-SoundLiftCustomThemeEditor','Get-SoundLiftContrastColor')) {
+foreach ($requiredThemeMarker in @('#C084FC','#22D3EE','#FB923C','#FACC55','OLED fekete','Midnight Blue','Purple Neon','Cyberpunk','Emerald','Carbon Gold','CustomThemeButton','Show-SoundLiftCustomThemeEditor','Get-SoundLiftContrastColor')) {
     if (-not $source.Contains($requiredThemeMarker)) { throw "Missing SoundLift theme marker: $requiredThemeMarker" }
 }
 foreach ($requiredThemeStartupFix in @("if (`$entry.Key -eq 'IsLight') { continue }", 'foreach ($themeOptionName in $script:themeNames)', 'try { Set-AppTheme $script:themeName } catch')) {
     if (-not $source.Contains($requiredThemeStartupFix)) { throw "Missing V1.6.6 theme startup fix: $requiredThemeStartupFix" }
 }
+if ($source.Contains("'Cyberpunk', 'Emerald', 'Arctic', 'R6 Siege'")) { throw 'Removed Arctic and R6 Siege theme names are still present in the selectable theme list' }
 foreach ($requiredUiFix in @(
     '<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden"',
     'function Test-SoundLiftProblemReportService',
@@ -218,7 +219,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='1.6.6'
+ $script:appVersion='1.6.7'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }
