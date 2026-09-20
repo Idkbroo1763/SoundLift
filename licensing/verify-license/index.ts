@@ -38,7 +38,7 @@ Deno.serve(async (request) => {
     const simulationLicenseId = String(body.simulation_license_id ?? "").trim().toLowerCase();
     const appVersion = String(body.app_version ?? "unknown").trim().slice(0,24);
     const buildChannel = String(body.build_channel ?? "public").trim().toLowerCase().slice(0,24);
-    if (!["verify","list_owner_targets"].includes(action) || licenseKey.length < 24 || licenseKey.length > 160 || !/^[a-f0-9]{64}$/.test(deviceId) || !/^[a-z0-9][a-z0-9_-]{2,63}$/.test(productId) || !uuidPattern.test(installationId)) {
+    if (!["verify","list_owner_targets","request_device_change"].includes(action) || licenseKey.length < 24 || licenseKey.length > 160 || !/^[a-f0-9]{64}$/.test(deviceId) || !/^[a-z0-9][a-z0-9_-]{2,63}$/.test(productId) || !uuidPattern.test(installationId)) {
       return reply(400, { allowed: false, code: "INVALID_REQUEST", message: "Érvénytelen licenckérés." });
     }
 
@@ -89,6 +89,16 @@ Deno.serve(async (request) => {
 
     const actualLicenseId = String(data.internal_license_id);
     const isOwner = data.is_owner === true;
+    if (action === "request_device_change") {
+      const { data: existing, error: existingError } = await supabase.from("soundlift_device_change_requests").select("id,requested_at").eq("license_id",actualLicenseId).eq("status","pending").maybeSingle();
+      if (existingError) throw existingError;
+      if (!existing) {
+        const { error: requestError } = await supabase.from("soundlift_device_change_requests").insert({license_id:actualLicenseId,installation_id:installationId,current_device_ref:deviceId.slice(0,12)});
+        if (requestError) throw requestError;
+        await storeAndForwardEvent(supabase,{category:"license",event_name:"device_change_requested",severity:"warning",app_version:appVersion,product_id:productId,installation_id:installationId,source:"backend",trusted:true,metadata:{support_id:`SL-${installationId.replaceAll("-","").slice(0,8).toUpperCase()}`,discord_user:`<@${linkedUser.discord_user_id}>`,license_ref:actualLicenseId,license_type:data.license_type,device_ref:deviceId.slice(0,12),request_status:"pending"}});
+      }
+      return reply(200,{allowed:true,code:existing ? "DEVICE_CHANGE_ALREADY_PENDING" : "DEVICE_CHANGE_REQUESTED",message:existing ? "Már van függőben lévő gépcsere-kérelmed." : "A gépcsere-kérelem elküldve.",request_status:"pending"});
+    }
     if (action === "list_owner_targets") {
       if (!isOwner) {
         await storeAndForwardEvent(supabase, { category:"security",event_name:"owner_mode_rejected",severity:"warning",installation_id:installationId,source:"backend",trusted:true,metadata:{ license_ref:actualLicenseId } });
@@ -148,7 +158,7 @@ Deno.serve(async (request) => {
         server_check:"online", features_enabled:enabledFeatures.length ? enabledFeatures.join(", ") : "nincs",
       },
     });
-    const publicData = { ...data, is_owner:isOwner, features:features ?? [], license_variant:licenseVariant, simulated_license:simulatedLicense };
+    const publicData = { ...data, is_owner:isOwner, features:features ?? [], license_variant:licenseVariant, device_ref:deviceId.slice(0,12), simulated_license:simulatedLicense };
     delete publicData.internal_license_id;
     delete publicData.activation_event;
     return reply(200, publicData);
