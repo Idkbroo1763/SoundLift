@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory=$true)][ValidateSet('detach_device','upsert_feature','set_license_feature','set_owner')][string]$Action,
+    [Parameter(Mandatory=$true)][ValidateSet('detach_device','upsert_feature','set_license_feature','set_owner','set_status')][string]$Action,
     [ValidatePattern('^[a-fA-F0-9-]{36}$')][string]$LicenseId,
     [ValidateLength(3,200)][string]$Reason,
     [ValidatePattern('^[a-z][a-z0-9_]{2,63}$')][string]$FeatureKey,
@@ -7,6 +7,7 @@ param(
     [ValidateLength(0,500)][string]$Description,
     [bool]$Enabled = $true,
     [hashtable]$Config = @{},
+    [ValidateSet('active','suspended','revoked')][string]$Status = 'active',
     [string]$ApiUrl = $env:SOUNDLIFT_ADMIN_API_URL,
     [string]$AdminKey = $env:SOUNDLIFT_ADMIN_API_KEY
 )
@@ -19,6 +20,7 @@ switch($Action){
     'upsert_feature' { if(-not $FeatureKey-or-not $DisplayName){throw 'A FeatureKey és DisplayName kötelező.'};$body.feature_key=$FeatureKey;$body.display_name=$DisplayName;$body.description=$Description }
     'set_license_feature' { if(-not $LicenseId-or-not $FeatureKey){throw 'A LicenseId és FeatureKey kötelező.'};$body.license_id=$LicenseId.ToLowerInvariant();$body.feature_key=$FeatureKey;$body.config=$Config }
     'set_owner' { if(-not $LicenseId){throw 'A LicenseId kötelező.'};$body.license_id=$LicenseId.ToLowerInvariant() }
+    'set_status' { if(-not $LicenseId-or-not $Reason){throw 'A LicenseId és Reason kötelező.'};$body.license_id=$LicenseId.ToLowerInvariant();$body.status=$Status;$body.reason=$Reason }
 }
 $headers=@{'Content-Type'='application/json; charset=utf-8';'x-soundlift-admin-key'=$AdminKey}
 $bytes=[Text.UTF8Encoding]::new($false).GetBytes(($body|ConvertTo-Json -Compress -Depth 8))

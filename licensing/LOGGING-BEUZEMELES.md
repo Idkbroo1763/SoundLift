@@ -11,6 +11,23 @@
   OAuth client secret, bot token és service-role kulcs nincs az EXE-ben.
 - A licencdöntések szerveroldali, `trusted=true` események. A kliensből érkező
   biztonsági események `trusted=false` jelölést kapnak.
+- A sikeres normál licencellenőrzés licencenként és gépenként naponta legfeljebb
+  egyszer kerül a Discordra. A kliens nem küld róla második eseményt, és a
+  `license_events` tábla sem tárol minden ismételt validálást. Ez kíméli a
+  Supabase-adatbázist, az Edge Function usage-et és a Discord webhookot.
+
+## A licencnapló tartalma
+
+| Esemény | Látható adatok |
+|---|---|
+| Ellenőrzés | normál / fejlesztői / egyedi típus, licencállapot, appverzió, buildcsatorna, ügyfélbuild, gépkötés, funkciójogosultságok |
+| Első aktiválás | új gépkötés és rövidített gépreferencia |
+| Gépcsere | sikeres átkötés vagy másik gép miatti elutasítás |
+| Tiltás / visszavonás | korábbi és új állapot, valamint az admin által megadott indok |
+| Offline türelmi idő | `server_check=offline`, licenctípus, verzió és a helyben tárolt funkciójogosultságok |
+| Egyedi funkció | funkciókulcs és `engedélyezve` / `letiltva` állapot |
+
+A napló nem tartalmaz nyers licenckulcsot vagy teljes gépazonosítót.
 
 Nem gyűjtünk Windows-felhasználónevet, e-mailt, nyers licenckulcsot, teljes
 gépazonosítót, Discord-üzeneteket, szerverlistát vagy kattintási előzményt. A
@@ -105,6 +122,16 @@ $env:SOUNDLIFT_ADMIN_API_KEY='AZ_ADMIN_KULCS'
 ```
 
 Az admin kulcs csak a saját gépeden legyen. Vásárlói buildbe soha ne kerüljön.
+
+## Licenc tiltása, visszavonása vagy újraaktiválása
+
+```powershell
+.\licensing\Invoke-SoundLiftLicenseAdmin.ps1 -Action set_status `
+  -LicenseId 'LICENSE_UUID' -Status revoked -Reason 'Visszavonva az ügyfél kérésére'
+```
+
+A `Status` értéke `active`, `suspended` vagy `revoked` lehet. Minden módosítás
+külön, megbízható admineseményként kerül a licencnaplóba.
 
 ## Ellenőrzés kiadás előtt
 

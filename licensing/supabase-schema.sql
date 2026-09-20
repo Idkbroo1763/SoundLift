@@ -126,8 +126,8 @@ begin
   for update of l;
 
   if not found then return jsonb_build_object('allowed', false, 'code', 'INVALID_LICENSE', 'message', 'A licenckulcs érvénytelen.'); end if;
-  if target.status <> 'active' then return jsonb_build_object('allowed', false, 'code', 'LICENSE_BLOCKED', 'message', 'A licenc le van tiltva.'); end if;
-  if target.expires_at is not null and target.expires_at <= now() then return jsonb_build_object('allowed', false, 'code', 'LICENSE_EXPIRED', 'message', 'A licenc lejárt.'); end if;
+  if target.status <> 'active' then return jsonb_build_object('allowed', false, 'code', 'LICENSE_BLOCKED', 'message', 'A licenc le van tiltva.', 'license_type',target.license_type,'license_status',target.status,'internal_license_id',target.id,'customer_name',target.customer_name); end if;
+  if target.expires_at is not null and target.expires_at <= now() then return jsonb_build_object('allowed', false, 'code', 'LICENSE_EXPIRED', 'message', 'A licenc lejárt.', 'license_type',target.license_type,'license_status','expired','internal_license_id',target.id,'customer_name',target.customer_name); end if;
   if target.device_id is not null and target.device_id <> p_device_id then
     return jsonb_build_object('allowed', false, 'code', 'DEVICE_LIMIT', 'message', 'A licenc már egy másik számítógéphez tartozik. Áthelyezéshez nyiss hibajegyet.');
   end if;
@@ -175,13 +175,13 @@ begin
   for update of l;
 
   if not found then return jsonb_build_object('allowed', false, 'code', 'INVALID_LICENSE', 'message', 'A licenckulcs érvénytelen.'); end if;
-  if target.status <> 'active' then return jsonb_build_object('allowed', false, 'code', 'LICENSE_BLOCKED', 'message', 'A licenc le van tiltva.'); end if;
-  if target.expires_at is not null and target.expires_at <= now() then return jsonb_build_object('allowed', false, 'code', 'LICENSE_EXPIRED', 'message', 'A licenc lejárt.'); end if;
+  if target.status <> 'active' then return jsonb_build_object('allowed', false, 'code', 'LICENSE_BLOCKED', 'message', 'A licenc le van tiltva.', 'license_type',target.license_type,'license_status',target.status,'internal_license_id',target.id,'customer_name',target.customer_name); end if;
+  if target.expires_at is not null and target.expires_at <= now() then return jsonb_build_object('allowed', false, 'code', 'LICENSE_EXPIRED', 'message', 'A licenc lejárt.', 'license_type',target.license_type,'license_status','expired','internal_license_id',target.id,'customer_name',target.customer_name); end if;
   if target.customer_discord_id is not null and target.customer_discord_id <> p_discord_id then
-    return jsonb_build_object('allowed', false, 'code', 'DISCORD_ACCOUNT_MISMATCH', 'message', 'Ez a licenc egy másik Discord-fiókhoz tartozik.');
+    return jsonb_build_object('allowed', false, 'code', 'DISCORD_ACCOUNT_MISMATCH', 'message', 'Ez a licenc egy másik Discord-fiókhoz tartozik.', 'license_type',target.license_type,'license_status',target.status,'internal_license_id',target.id,'customer_name',target.customer_name);
   end if;
   if target.device_id is not null and target.device_id <> p_device_id then
-    return jsonb_build_object('allowed', false, 'code', 'DEVICE_LIMIT', 'message', 'A licenc már egy másik számítógéphez tartozik. Áthelyezéshez nyiss hibajegyet.');
+    return jsonb_build_object('allowed', false, 'code', 'DEVICE_LIMIT', 'message', 'A licenc már egy másik számítógéphez tartozik. Áthelyezéshez nyiss hibajegyet.', 'license_type',target.license_type,'license_status',target.status,'internal_license_id',target.id,'customer_name',target.customer_name);
   end if;
 
   activation_kind := case
@@ -190,10 +190,13 @@ begin
     else 'validated'
   end;
   update public.licenses set device_id=coalesce(device_id,p_device_id), activated_at=coalesce(activated_at,now()), last_seen_at=now() where id=target.id;
-  insert into public.license_events(license_id,event_type,device_id) values(target.id,activation_kind,p_device_id);
+  if activation_kind <> 'validated' then
+    insert into public.license_events(license_id,event_type,device_id) values(target.id,activation_kind,p_device_id);
+  end if;
   return jsonb_build_object(
     'allowed',true,'code','OK','message','A licenc érvényes.',
     'license_type',target.license_type,'is_owner',target.is_owner,
+    'license_status',target.status,'customer_name',target.customer_name,'transfer_count',target.transfer_count,
     'internal_license_id',target.id,'activation_event',activation_kind
   );
 end;
