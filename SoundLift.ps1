@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '2.0.1'
+$script:appVersion = '2.0.2'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -809,7 +809,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V2.0.1" Width="1320" Height="900" MinWidth="1100" MinHeight="760"
+        Title="SoundLift V2.0.2" Width="1280" Height="800" MinWidth="1024" MinHeight="700"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -879,8 +879,8 @@ $xaml = @'
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
     </Style>
     <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource UtilityButton}">
-      <Setter Property="Foreground" Value="#FF7A8A"/><Setter Property="Background" Value="#241014"/>
-      <Setter Property="BorderBrush" Value="#5A2029"/><Setter Property="Padding" Value="16,10"/>
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/><Setter Property="Background" Value="{DynamicResource ControlBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentTextBrush}"/><Setter Property="Padding" Value="16,10"/>
     </Style>
     <Style x:Key="QuickProfileButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
       <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/>
@@ -983,7 +983,7 @@ $xaml = @'
   <Grid Background="{DynamicResource PageGradient}">
     <Grid.ColumnDefinitions><ColumnDefinition Width="196"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
 
-    <Border Grid.Column="0" Margin="14" Background="#E90B0B0D" CornerRadius="16" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
+    <Border Grid.Column="0" Margin="14" Background="{DynamicResource SurfaceBrush}" CornerRadius="16" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
       <Grid Margin="13">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <StackPanel Margin="5,9,5,24">
@@ -1006,17 +1006,42 @@ $xaml = @'
         <StackPanel Grid.Row="2">
           <TextBlock Text="TÉMA" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="7,0,0,6"/>
           <ComboBox Name="ThemeCombo" Height="34" Margin="0,0,0,8" Padding="8,3" Background="{DynamicResource ControlBrush}" Foreground="{DynamicResource PrimaryTextBrush}" BorderBrush="{DynamicResource BorderBrush}" FontWeight="SemiBold">
+            <ComboBox.Template>
+              <ControlTemplate TargetType="{x:Type ComboBox}">
+                <Grid>
+                  <ToggleButton Focusable="False" ClickMode="Press" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                    <ToggleButton.Template>
+                      <ControlTemplate TargetType="{x:Type ToggleButton}">
+                        <Border x:Name="ThemeBorder" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="7">
+                          <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions><Path Grid.Column="1" Width="8" Height="5" Fill="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M 0 0 L 4 4 L 8 0 Z"/></Grid>
+                        </Border>
+                        <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ThemeBorder" Property="BorderBrush" Value="{DynamicResource AccentTextBrush}"/></Trigger></ControlTemplate.Triggers>
+                      </ControlTemplate>
+                    </ToggleButton.Template>
+                  </ToggleButton>
+                  <TextBlock Margin="10,0,31,0" VerticalAlignment="Center" IsHitTestVisible="False" Text="{TemplateBinding SelectionBoxItem}" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis"/>
+                  <Popup Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
+                    <Border Margin="0,3,0,0" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="310" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="7">
+                      <ScrollViewer Margin="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer>
+                    </Border>
+                  </Popup>
+                </Grid>
+              </ControlTemplate>
+            </ComboBox.Template>
             <ComboBox.Resources>
-              <Style TargetType="{x:Type ComboBoxItem}"><Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/><Setter Property="Background" Value="{DynamicResource ControlBrush}"/><Setter Property="Padding" Value="8,5"/></Style>
+              <Style TargetType="{x:Type ComboBoxItem}">
+                <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/><Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}"/><Setter Property="Padding" Value="9,6"/>
+                <Style.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource HoverBrush}"/></Trigger><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{DynamicResource AccentTextBrush}"/><Setter Property="Foreground" Value="{DynamicResource AccentContrastBrush}"/></Trigger></Style.Triggers>
+              </Style>
             </ComboBox.Resources>
           </ComboBox>
-          <Border Background="#241014" BorderBrush="#5A2029" BorderThickness="1" CornerRadius="11" Padding="11,9" Margin="0,3,0,9">
+          <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource AccentTextBrush}" BorderThickness="1" CornerRadius="11" Padding="11,9" Margin="0,3,0,9">
             <StackPanel>
               <TextBlock Text="SOUNDLIFT PRO" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}"/>
               <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,3,0,0"/>
             </StackPanel>
           </Border>
-          <TextBlock Name="VersionText" Text="Telepített verzió: 2.0.1" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="4,0,0,3"/>
+          <TextBlock Name="VersionText" Text="Telepített verzió: 2.0.2" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="4,0,0,3"/>
           <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" FontSize="9" Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis" Margin="4,0,0,4"/>
           <Button Name="CopySupportIdButton" Content="⧉  ID másolása" Style="{StaticResource UtilityButton}" Margin="0"/>
         </StackPanel>
@@ -1033,7 +1058,7 @@ $xaml = @'
           <TextBlock Text="NAGYOBB ÉLMÉNY." FontFamily="Segoe UI Black" FontSize="27" Foreground="{DynamicResource AccentTextBrush}" Margin="0,-3,0,0"/>
           <TextBlock Text="A hangerőn túl – teljesen személyre szabható hangzás." FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="1,2,0,0"/>
         </StackPanel>
-        <Border Name="StatusBorder" Grid.Column="1" Background="#D9111113" CornerRadius="12" Padding="14,10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+        <Border Name="StatusBorder" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="12" Padding="14,10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
           <StackPanel>
             <TextBlock Name="StatusText" Text="A hangrendszer ellenőrzése folyamatban…" FontSize="12" FontWeight="SemiBold"/>
             <TextBlock Name="DeviceText" Text="Aktív hangkimenet észlelése…" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
@@ -1050,7 +1075,7 @@ $xaml = @'
               <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="205"/><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <Grid Width="184" Height="184" VerticalAlignment="Center">
-                  <Ellipse Stroke="#38181D" StrokeThickness="16" Fill="{DynamicResource SurfaceAltBrush}"/>
+                  <Ellipse Stroke="{DynamicResource HoverBrush}" StrokeThickness="16" Fill="{DynamicResource SurfaceAltBrush}"/>
                   <Ellipse Stroke="{DynamicResource AccentTextBrush}" StrokeThickness="7" Margin="12"/>
                   <Ellipse Stroke="{DynamicResource BorderBrush}" StrokeThickness="1" Margin="28"/>
                   <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -1141,8 +1166,8 @@ $xaml = @'
                 <CheckBox Name="OverlayCheck" Visibility="Collapsed" IsChecked="False"/>
                 <CheckBox Name="DiscordPresenceCheck" Visibility="Collapsed" IsChecked="False"/>
               </WrapPanel>
-              <Border Grid.Column="1" Background="#12291F" CornerRadius="9" Padding="12,7">
-                <TextBlock Name="ClipText" Text="VÉDVE" Foreground="#4ADE80" FontWeight="Bold" FontSize="10"/>
+              <Border Grid.Column="1" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource AccentTextBrush}" BorderThickness="1" CornerRadius="9" Padding="12,7">
+                <TextBlock Name="ClipText" Text="VÉDVE" Foreground="{DynamicResource AccentTextBrush}" FontWeight="Bold" FontSize="10"/>
               </Border>
             </Grid>
           </Border>
@@ -1155,17 +1180,19 @@ $xaml = @'
           </UniformGrid>
 
           <Border Style="{StaticResource DashboardCard}" Padding="15">
-            <WrapPanel>
-              <Button Name="AppVolumeButton" Content="▥  Alkalmazások hangereje" Style="{StaticResource UtilityButton}"/>
-              <Button Name="MicrophoneButton" Content="◉  Mikrofonjavítás" Style="{StaticResource UtilityButton}"/>
-              <Button Name="UndoButton" Content="↶  Visszavonás" Style="{StaticResource UtilityButton}"/>
-              <Button Name="ReportProblemButton" Content="⚑  Hibajelentés" Style="{StaticResource UtilityButton}"/>
-              <Button Name="BypassButton" Content="⛨  Biztonságos mód" Style="{StaticResource DangerButton}"/>
-              <Button Name="StatisticsButton" Visibility="Collapsed"/>
-              <Button Name="DeveloperConsoleButton" Visibility="Collapsed"/>
-              <Button Name="OwnerModeButton" Visibility="Collapsed"/>
-              <Button Name="RollbackButton" Visibility="Collapsed"/>
-            </WrapPanel>
+            <Grid>
+              <UniformGrid Columns="3">
+                <Button Name="AppVolumeButton" Content="▥  Alkalmazások hangereje" Style="{StaticResource UtilityButton}" Margin="0,0,8,8"/>
+                <Button Name="MicrophoneButton" Content="◉  Mikrofonjavítás" Style="{StaticResource UtilityButton}" Margin="0,0,8,8"/>
+                <Button Name="UndoButton" Content="↶  Visszavonás" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
+                <Button Name="ReportProblemButton" Content="⚑  Hibajelentés" Style="{StaticResource UtilityButton}" Margin="0,0,8,0"/>
+                <Button Name="BypassButton" Content="⛨  Biztonságos mód" Style="{StaticResource DangerButton}" Margin="0,0,8,0"/>
+              </UniformGrid>
+              <Grid Visibility="Collapsed">
+                <Button Name="StatisticsButton"/><Button Name="DeveloperConsoleButton"/>
+                <Button Name="OwnerModeButton"/><Button Name="RollbackButton"/>
+              </Grid>
+            </Grid>
           </Border>
         </StackPanel>
       </ScrollViewer>
@@ -1201,7 +1228,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V2.0.1'
+$script:trayIcon.Text = 'SoundLift V2.0.2'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -1229,12 +1256,12 @@ for ($i = 0; $i -lt $script:eqBands.Count; $i++) {
     $column.HorizontalAlignment = 'Center'
     $bandLabel = New-Object Windows.Controls.TextBlock
     $bandLabel.Text = if ($script:eqBands[$i] -ge 1000) { "$($script:eqBands[$i] / 1000)k" } else { "$($script:eqBands[$i])" }
-    $bandLabel.HorizontalAlignment = 'Center'; $bandLabel.Foreground = '#AAB2C0'
+    $bandLabel.HorizontalAlignment = 'Center'; $bandLabel.Foreground = $window.Resources['MutedTextBrush']
     $slider = New-Object Windows.Controls.Slider
     $slider.Minimum = -12; $slider.Maximum = 12; $slider.Value = 0; $slider.TickFrequency = 1; $slider.IsSnapToTickEnabled = $true
     $slider.Style = $window.FindResource('VerticalEqSlider')
     $valueLabel = New-Object Windows.Controls.TextBlock
-    $valueLabel.Text = '0'; $valueLabel.HorizontalAlignment = 'Center'; $valueLabel.Foreground = '#FF4057'
+    $valueLabel.Text = '0'; $valueLabel.HorizontalAlignment = 'Center'; $valueLabel.Foreground = $window.Resources['AccentTextBrush']
     [void]$column.Children.Add($bandLabel); [void]$column.Children.Add($slider); [void]$column.Children.Add($valueLabel)
     [void]$EqPanel.Children.Add($column)
     $script:eqSliders += $slider; $script:eqValueLabels += $valueLabel
@@ -1283,6 +1310,7 @@ function Set-AppTheme([string]$themeName) {
     $ThemeCombo.Foreground = $window.Resources['PrimaryTextBrush']
     $VersionText.Foreground = $window.Resources['MutedTextBrush']; $SupportIdText.Foreground = $window.Resources['MutedTextBrush']; $LicenseStatusText.Foreground = $window.Resources['MutedTextBrush']
     $ApplyButton.Foreground = $window.Resources['AccentContrastBrush']
+    if ($StatusBorder) { $StatusBorder.Background = $window.Resources['SurfaceBrush']; $StatusBorder.BorderBrush = $window.Resources['BorderBrush'] }
     $script:themeName = $themeName
     try { $handle=[Windows.Interop.WindowInteropHelper]::new($window).Handle; $dark=$(if($theme.IsLight){0}else{1}); [void][AudioAppNative]::DwmSetWindowAttribute($handle,20,[ref]$dark,4) } catch { }
 }
@@ -1328,13 +1356,14 @@ function Get-SoundLiftProfileDisplayName([string]$profileId) {
 function Show-ProfileOverlay([string]$profileName) {
     if (-not $script:profileOverlayEnabled -or $script:doNotDisturb) { return }
     try {
+        $palette = Get-SoundLiftThemePalette
         $overlay = [Windows.Window]::new()
         $overlay.Width=330; $overlay.Height=92; $overlay.WindowStyle='None'; $overlay.ResizeMode='NoResize'; $overlay.ShowInTaskbar=$false
         $overlay.Topmost=$true; $overlay.ShowActivated=$false; $overlay.Focusable=$false; $overlay.IsHitTestVisible=$false; $overlay.AllowsTransparency=$true; $overlay.Background=[Windows.Media.Brushes]::Transparent
         $work=[Windows.SystemParameters]::WorkArea; $overlay.Left=$work.Right-$overlay.Width-20; $overlay.Top=$work.Top+20
-        $card=[Windows.Controls.Border]::new(); $card.Background='#EE111113'; $card.BorderBrush=$window.Resources['AccentTextBrush']; $card.BorderThickness=[Windows.Thickness]::new(1); $card.CornerRadius=[Windows.CornerRadius]::new(14); $card.Padding=[Windows.Thickness]::new(18,13,18,13)
+        $card=[Windows.Controls.Border]::new(); $card.Background=New-SoundLiftBrush $palette.Surface; $card.Opacity=0.96; $card.BorderBrush=New-SoundLiftBrush $palette.Accent; $card.BorderThickness=[Windows.Thickness]::new(1); $card.CornerRadius=[Windows.CornerRadius]::new(14); $card.Padding=[Windows.Thickness]::new(18,13,18,13)
         $panel=[Windows.Controls.StackPanel]::new(); $title=[Windows.Controls.TextBlock]::new(); $title.Text='SOUNDLIFT PROFIL'; $title.FontSize=10; $title.FontWeight='Bold'; $title.Foreground=$window.Resources['AccentTextBrush']
-        $name=[Windows.Controls.TextBlock]::new(); $name.Text=$profileName; $name.FontSize=20; $name.FontWeight='SemiBold'; $name.Foreground='#F8FAFC'; $name.Margin=[Windows.Thickness]::new(0,3,0,0)
+        $name=[Windows.Controls.TextBlock]::new(); $name.Text=$profileName; $name.FontSize=20; $name.FontWeight='SemiBold'; $name.Foreground=New-SoundLiftBrush $palette.Primary; $name.Margin=[Windows.Thickness]::new(0,3,0,0)
         [void]$panel.Children.Add($title); [void]$panel.Children.Add($name); $card.Child=$panel; $overlay.Content=$card
         $timer=[Windows.Threading.DispatcherTimer]::new(); $timer.Interval=[TimeSpan]::FromMilliseconds(1700); $timer.Add_Tick({$timer.Stop();$overlay.Close()}.GetNewClosure())
         $overlay.Add_ContentRendered({$timer.Start()}.GetNewClosure()); $overlay.Show()
@@ -1356,11 +1385,11 @@ function Update-Labels {
     $roughVolumeDb = if ([double]$VolumeSlider.Value -le 0) { -100.0 } else { 20.0 * [Math]::Log10([double]$VolumeSlider.Value / 100.0) }
     $roughPeak = $roughVolumeDb + ([double]$BassSlider.Value * 0.55)
     if ($SafetyCheck.IsChecked) {
-        $ClipText.Text = 'VÉDVE'; $ClipText.Foreground = '#4ADE80'
+        $ClipText.Text = 'VÉDVE'; $ClipText.Foreground = $window.Resources['AccentTextBrush']
     } elseif ($roughPeak -gt 6) {
-        $ClipText.Text = 'TORZÍTÁSVESZÉLY'; $ClipText.Foreground = '#FB7185'
+        $ClipText.Text = 'TORZÍTÁSVESZÉLY'; $ClipText.Foreground = $window.Resources['AccentTextBrush']
     } else {
-        $ClipText.Text = 'VÉDELEM NÉLKÜL'; $ClipText.Foreground = '#FBBF24'
+        $ClipText.Text = 'VÉDELEM NÉLKÜL'; $ClipText.Foreground = $window.Resources['SecondaryTextBrush']
     }
 }
 
@@ -1444,10 +1473,10 @@ $ProfileOrderButton.Add_Click({Show-ProfileOrderEditor})
 $apoDirectory = Get-ApoConfigDirectory
 if ($apoDirectory) {
     $StatusText.Text = "Készen áll • Az Equalizer APO megfelelően csatlakozik"
-    $StatusBorder.Background = '#143126'
+    $StatusBorder.Background = $window.Resources['SurfaceAltBrush']
 } else {
     $StatusText.Text = "Beavatkozás szükséges • Az Equalizer APO nem található; lásd a TELEPÍTÉS.txt fájlt"
-    $StatusBorder.Background = '#3A2812'
+    $StatusBorder.Background = $window.Resources['HoverBrush']
 }
 
 function Read-TextWithRetry([string]$path) {
@@ -1555,7 +1584,7 @@ $ApplyButton.Add_Click({
         Write-TextWithRetry $mainConfig $mainText
         $script:isBypassed = $false
         $StatusText.Text = "Beállítások alkalmazva • $([int]$volumePercent)% hangerő • $([int]$bassDb) dB basszus"
-        $StatusBorder.Background = '#143126'
+        $StatusBorder.Background = $window.Resources['SurfaceAltBrush']
     } catch {
         Write-SoundLiftLog -Category crash -EventName 'handled_runtime_error' -Severity error -Data @{ component='apply_audio_config' } -ErrorRecord $_
         Show-SoundLiftMessage "Nem sikerült menteni:`n$($_.Exception.Message)" 'SoundLift – hiba' 'OK' 'Error' $window | Out-Null
@@ -1845,7 +1874,7 @@ function Repair-SoundLiftApoInclude([switch]$Automatic) {
         $after = Get-SoundLiftApoHealth
         if (-not $after.Healthy) { throw "REPAIR_VERIFY_FAILED: $($after.Code)" }
         $StatusText.Text = 'Az APO-kapcsolat sikeresen helyreállt'
-        $StatusBorder.Background = '#143126'
+        $StatusBorder.Background = $window.Resources['SurfaceAltBrush']
         Write-SoundLiftLog -Category startup -EventName 'automatic_repair_result' -Data @{ result='success'; code=$repairCode; component='apo_config' }
         if (-not $Automatic) { Show-SoundLiftMessage "A SoundLift hangkapcsolata sikeresen helyreállt.`n`nAz eredeti config.txt biztonsági mentése is elkészült." 'SoundLift – APO javítás' 'OK' 'Information' $window | Out-Null }
         return $true
@@ -1853,7 +1882,7 @@ function Repair-SoundLiftApoInclude([switch]$Automatic) {
         $shortCode = if ($_.Exception.Message -match '^([A-Z_]+):') { $Matches[1] } else { $repairCode }
         Write-SoundLiftLog -Category crash -EventName 'automatic_repair_result' -Severity error -Data @{ result='failed'; code=$shortCode; component='apo_config' } -ErrorRecord $_
         $StatusText.Text = "Az APO-kapcsolat nem javítható: $($_.Exception.Message)"
-        $StatusBorder.Background = '#4A1F2D'
+        $StatusBorder.Background = $window.Resources['HoverBrush']
         if (-not $Automatic) { Show-SoundLiftMessage "A javítás nem sikerült ($shortCode):`n$($_.Exception.Message)" 'SoundLift – APO javítás' 'OK' 'Error' $window | Out-Null }
         return $false
     }
@@ -1919,7 +1948,7 @@ function Show-ProblemReportWindow {
             if (-not (Test-SoundLiftProblemReportQueued)) { throw 'A jelentés helyi előkészítése sikertelen volt.' }
             $sent = Send-SoundLiftPendingLogs
             $StatusText.Text = if ($sent) { 'A hibajelentést sikeresen elküldtük' } else { 'A hibajelentést mentettük, a következő indításkor újraküldjük' }
-            $StatusBorder.Background = if ($sent) { '#143126' } else { '#4A3514' }
+            $StatusBorder.Background = if ($sent) { $window.Resources['SurfaceAltBrush'] } else { $window.Resources['HoverBrush'] }
             $dialog.Close()
             $resultText = if ($sent) { 'A jelentést sikeresen elküldtük.' } else { 'A jelentést biztonságosan elmentettük, és a következő indításkor automatikusan újraküldjük.' }
             Show-SoundLiftMessage "$resultText`nTámogatási ID: $(Get-SoundLiftSupportId)" 'SoundLift – Hiba jelentése' 'OK' 'Information' $dialog | Out-Null
@@ -2291,7 +2320,7 @@ function Show-PostUpdateResult {
         $dialog=[Windows.Window]::new(); $dialog.Title='SoundLift – Frissítés kész'; $dialog.Width=500; $dialog.Height=245
         $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; Set-SoundLiftWindowStyle $dialog
         $panel=[Windows.Controls.StackPanel]::new(); $panel.Margin=[Windows.Thickness]::new(28)
-        $title=[Windows.Controls.TextBlock]::new(); $title.Text='✓  A frissítés sikeresen települt'; $title.FontSize=22; $title.FontWeight='Bold'; $title.Foreground='#4ADE80'
+        $title=[Windows.Controls.TextBlock]::new(); $title.Text='✓  A frissítés sikeresen települt'; $title.FontSize=22; $title.FontWeight='Bold'; $title.Foreground=$window.Resources['AccentTextBrush']
         $details=[Windows.Controls.TextBlock]::new(); $details.Text="A SoundLift most már a V$script:appVersion verziót használja.`nMinden beállításod megmaradt."; $details.FontSize=14; $details.LineHeight=22; $details.Margin=[Windows.Thickness]::new(0,18,0,22); $details.Foreground='#CBD5E1'
         $close=[Windows.Controls.Button]::new(); $close.Content='Rendben'; $close.Width=120; $close.HorizontalAlignment='Right'; $close.Style=$window.Resources['PrimaryButton']; $close.Add_Click({$dialog.Close()}.GetNewClosure())
         $panel.Children.Add($title)|Out-Null; $panel.Children.Add($details)|Out-Null; $panel.Children.Add($close)|Out-Null
@@ -2380,6 +2409,12 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V2.0.2 – EGYSÉGES, OLVASHATÓ TÉMÁK
+• Minden főképernyős vezérlő, állapotjelzés és lenyíló lista követi a kiválasztott témát.
+• A témaválasztó teljesen egyedi, jól olvasható listát kapott rendszerfehér elemek nélkül.
+• Az alsó gyorsműveletek rugalmas rácsba kerültek, ezért kisebb ablakban sem lógnak ki.
+• A főablak már 1024×700-as mérettől használható, és kisebb kijelzőn is minden tartalom elérhető.
+
 V2.0.1 – REFERENCIAHŰ DASHBOARD
 • A főablak elrendezése teljesen megújult a kiválasztott fekete-piros SoundLift látványterv alapján.
 • Új bal oldali navigáció, központi hangerőmérő, kompakt hangvezérlők és alsó gyorsfunkció-kártyák.
@@ -2793,7 +2828,7 @@ function Invoke-SoundLiftBypass([bool]$Confirm = $true) {
     try {
         Disable-SoundLiftEffects
         $script:isBypassed = $true
-        $StatusText.Text = 'Biztonságos mód aktív • az eredeti hang visszaállítva'; $StatusBorder.Background = '#4A1F2D'
+        $StatusText.Text = 'Biztonságos mód aktív • az eredeti hang visszaállítva'; $StatusBorder.Background = $window.Resources['HoverBrush']
     } catch {
         Write-SoundLiftLog -Category crash -EventName 'handled_runtime_error' -Severity error -Data @{ component='safe_mode' } -ErrorRecord $_
         Show-SoundLiftMessage "A biztonságos mód nem kapcsolható be:`n$($_.Exception.Message)" 'SoundLift – hiba' 'OK' 'Error' $window | Out-Null
@@ -3095,17 +3130,17 @@ function Update-LiveAudioMeter {
         $LiveBoostText.Text = if ($volumeBoost -le -90) { 'Erősítés: némítva' } else { 'Erősítés: {0:+0.0;-0.0;0.0} dB' -f $volumeBoost }
         $peak = [Math]::Max($left, $right)
         if ($peak -ge 98.5) {
-            $LiveClipText.Text = 'TORZÍTÁS'; $LiveClipText.Foreground = '#FB7185'
-            $LeftPeakMeter.Foreground = '#FB7185'; $RightPeakMeter.Foreground = '#FB7185'
+            $LiveClipText.Text = 'TORZÍTÁS'; $LiveClipText.Foreground = $window.Resources['AccentTextBrush']
+            $LeftPeakMeter.Foreground = $window.Resources['AccentTextBrush']; $RightPeakMeter.Foreground = $window.Resources['AccentTextBrush']
             if($script:statistics -and ([DateTime]::UtcNow-$script:lastClipStatisticUtc).TotalSeconds -ge 10){$script:statistics.clippingWarnings=[int64]$script:statistics.clippingWarnings+1;$script:lastClipStatisticUtc=[DateTime]::UtcNow}
         } elseif ($peak -ge 85) {
-            $LiveClipText.Text = 'MAGAS JELSZINT'; $LiveClipText.Foreground = '#FBBF24'
-            $LeftPeakMeter.Foreground = '#FBBF24'; $RightPeakMeter.Foreground = '#FBBF24'
+            $LiveClipText.Text = 'MAGAS JELSZINT'; $LiveClipText.Foreground = $window.Resources['AccentTextBrush']
+            $LeftPeakMeter.Foreground = $window.Resources['AccentTextBrush']; $RightPeakMeter.Foreground = $window.Resources['AccentTextBrush']
         } elseif ($peak -gt 0.5) {
-            $LiveClipText.Text = 'AKTÍV'; $LiveClipText.Foreground = '#4ADE80'
+            $LiveClipText.Text = 'AKTÍV'; $LiveClipText.Foreground = $window.Resources['AccentTextBrush']
             $LeftPeakMeter.Foreground = $window.Resources['AccentTextBrush']; $RightPeakMeter.Foreground = $window.Resources['AccentTextBrush']
         } else {
-            $LiveClipText.Text = 'NINCS JEL'; $LiveClipText.Foreground = '#64748B'
+            $LiveClipText.Text = 'NINCS JEL'; $LiveClipText.Foreground = $window.Resources['MutedTextBrush']
             $LeftPeakMeter.Foreground = $window.Resources['AccentTextBrush']; $RightPeakMeter.Foreground = $window.Resources['AccentTextBrush']
         }
     } catch { }
@@ -3261,7 +3296,7 @@ $window.Add_SourceInitialized({
     } catch { }
     $script:windowSource = [Windows.Interop.HwndSource]::FromHwnd($script:windowHandle)
     $script:windowSource.AddHook($script:hotKeyHook)
-    try { Register-SoundLiftHotKeys } catch { $StatusText.Text=$_.Exception.Message; $StatusBorder.Background='#4A1F2D' }
+    try { Register-SoundLiftHotKeys } catch { $StatusText.Text=$_.Exception.Message; $StatusBorder.Background=$window.Resources['HoverBrush'] }
 })
 
 # Tray quick menu. The NotifyIcon itself was intentionally created much
