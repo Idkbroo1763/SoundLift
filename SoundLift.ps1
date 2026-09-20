@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.4.7'
+$script:appVersion = '1.5.0'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -62,6 +62,110 @@ $script:discordLinkRequired = $true
 $script:discordLinkGraceHours = 720
 $script:loggerInitialized = $false
 $script:startupCompleted = $false
+$script:themeName = 'Fekete és piros'
+
+function Get-SoundLiftThemePalette([string]$themeName = $script:themeName) {
+    $theme = switch ($themeName) {
+        { $_ -in @('Fekete és kék','Black & Blue') }     { @{ Accent='#38BDF8'; AccentDark='#0369A1'; Page='#071824'; Hover='#12364A' } }
+        { $_ -in @('Grafit és zöld','Graphite & Green') } { @{ Accent='#4ADE80'; AccentDark='#15803D'; Page='#092016'; Hover='#143A26' } }
+        'Fekete és lila'    { @{ Accent='#C084FC'; AccentDark='#7E22CE'; Page='#1A0B28'; Hover='#382050' } }
+        'Éjkék és türkiz'   { @{ Accent='#22D3EE'; AccentDark='#0E7490'; Page='#061E2D'; Hover='#123C4C' } }
+        'Grafit és narancs' { @{ Accent='#FB923C'; AccentDark='#C2410C'; Page='#241307'; Hover='#422414'; Contrast='#111113' } }
+        'Fekete és arany'   { @{ Accent='#FACC55'; AccentDark='#A16207'; Page='#211804'; Hover='#3B2D10'; Contrast='#111113' } }
+        'OLED fekete'       { @{ Accent='#F8FAFC'; AccentDark='#64748B'; Page='#000000'; Hover='#202024'; Base='#000000'; Surface='#070709'; SurfaceAlt='#000000'; Control='#111114'; Border='#303038'; Contrast='#09090B' } }
+        default             { @{ Accent='#FF4D67'; AccentDark='#A60024'; Page='#220A10'; Hover='#40131C' } }
+    }
+    return @{
+        Accent=$theme.Accent; AccentDark=$theme.AccentDark; Page=$theme.Page; Hover=$theme.Hover
+        Base=$(if($theme.Base){$theme.Base}else{'#070709'}); Surface=$(if($theme.Surface){$theme.Surface}else{'#121216'})
+        SurfaceAlt=$(if($theme.SurfaceAlt){$theme.SurfaceAlt}else{'#0C0C10'}); Control=$(if($theme.Control){$theme.Control}else{'#1A1A20'})
+        Border=$(if($theme.Border){$theme.Border}else{'#303038'}); Primary=$(if($theme.Primary){$theme.Primary}else{'#F8FAFC'})
+        Secondary=$(if($theme.Secondary){$theme.Secondary}else{'#D4D9E2'}); Muted=$(if($theme.Muted){$theme.Muted}else{'#8B96A8'})
+        Section=$(if($theme.Section){$theme.Section}else{'#AEB7C6'}); Contrast=$(if($theme.Contrast){$theme.Contrast}else{'#FFFFFF'})
+        Success='#4ADE80'; Warning='#FBBF24'; Danger='#FB7185'
+    }
+}
+
+function Get-SoundLiftSavedThemeName {
+    try {
+        $earlySettingsPath = Join-Path $env:APPDATA 'SoundLift\settings.json'
+        if (Test-Path -LiteralPath $earlySettingsPath) {
+            $saved = Get-Content -LiteralPath $earlySettingsPath -Raw | ConvertFrom-Json
+            $name = [string]$saved.theme
+            $normalized = switch ($name) { 'Black & Red' {'Fekete és piros'} 'Black & Blue' {'Fekete és kék'} 'Graphite & Green' {'Grafit és zöld'} 'Világos' {'Fekete és piros'} default { if($name){$name}else{'Fekete és piros'} } }
+            return $normalized
+        }
+    } catch { }
+    return 'Fekete és piros'
+}
+$script:themeName = Get-SoundLiftSavedThemeName
+
+function New-SoundLiftBrush([string]$color) {
+    return [Windows.Media.SolidColorBrush]::new([Windows.Media.ColorConverter]::ConvertFromString($color))
+}
+
+function Set-SoundLiftElementTheme([Windows.DependencyObject]$element, [hashtable]$palette) {
+    if ($null -eq $element) { return }
+    if ($element -is [Windows.Controls.TextBlock]) {
+        $element.Foreground = if ($element.FontSize -ge 20) { New-SoundLiftBrush $palette.Accent } elseif ($element.FontSize -le 12) { New-SoundLiftBrush $palette.Muted } else { New-SoundLiftBrush $palette.Primary }
+        $element.TextWrapping = if ($element.TextWrapping -eq 'NoWrap') { 'NoWrap' } else { 'Wrap' }
+    } elseif ($element -is [Windows.Controls.Button]) {
+        if (-not $element.Style) {
+            $element.Background = New-SoundLiftBrush $(if([string]$element.Tag -eq 'PrimaryAction'){$palette.Accent}else{$palette.Control})
+            $element.Foreground = New-SoundLiftBrush $(if([string]$element.Tag -eq 'PrimaryAction'){$palette.Contrast}else{$palette.Primary})
+            $element.BorderBrush = New-SoundLiftBrush $palette.Border; $element.BorderThickness = [Windows.Thickness]::new(1)
+            $element.Padding = [Windows.Thickness]::new(16,9,16,9); $element.MinHeight = [Math]::Max(38, $element.MinHeight)
+        }
+        $element.FontFamily = 'Segoe UI Semibold'; $element.Cursor = 'Hand'
+    } elseif ($element -is [Windows.Controls.TextBox] -or $element -is [Windows.Controls.ComboBox] -or $element -is [Windows.Controls.ListBox]) {
+        $element.Background = New-SoundLiftBrush $palette.Control; $element.Foreground = New-SoundLiftBrush $palette.Primary
+        $element.BorderBrush = New-SoundLiftBrush $palette.Border; $element.BorderThickness = [Windows.Thickness]::new(1)
+    } elseif ($element -is [Windows.Controls.CheckBox] -or $element -is [Windows.Controls.RadioButton]) {
+        $element.Foreground = New-SoundLiftBrush $palette.Secondary
+    } elseif ($element -is [Windows.Controls.Border]) {
+        if ($element.Background -and $element.Background -is [Windows.Media.SolidColorBrush] -and $element.Background.Color.ToString() -in @('#FF09090B','#FF0B0B0D','#FF111113','#FF08090B','#FF050505')) { $element.Background = New-SoundLiftBrush $palette.Surface }
+        if ($element.BorderThickness.Left -gt 0) { $element.BorderBrush = New-SoundLiftBrush $palette.Border }
+    }
+    $count = [Windows.Media.VisualTreeHelper]::GetChildrenCount($element)
+    for ($i = 0; $i -lt $count; $i++) { Set-SoundLiftElementTheme ([Windows.Media.VisualTreeHelper]::GetChild($element,$i)) $palette }
+}
+
+function Set-SoundLiftWindowStyle([Windows.Window]$targetWindow) {
+    if ($null -eq $targetWindow) { return }
+    $palette = Get-SoundLiftThemePalette
+    $accent = [Windows.Media.ColorConverter]::ConvertFromString($palette.Accent)
+    $accentDark = [Windows.Media.ColorConverter]::ConvertFromString($palette.AccentDark)
+    $base = [Windows.Media.ColorConverter]::ConvertFromString($palette.Base)
+    $page = [Windows.Media.ColorConverter]::ConvertFromString($palette.Page)
+    $gradient = [Windows.Media.LinearGradientBrush]::new(); $gradient.StartPoint=[Windows.Point]::new(0,0); $gradient.EndPoint=[Windows.Point]::new(1,1)
+    $gradient.GradientStops.Add([Windows.Media.GradientStop]::new($base,0)); $gradient.GradientStops.Add([Windows.Media.GradientStop]::new($page,0.55)); $gradient.GradientStops.Add([Windows.Media.GradientStop]::new($base,1))
+    $accentGradient = [Windows.Media.LinearGradientBrush]::new(); $accentGradient.StartPoint=[Windows.Point]::new(0,0); $accentGradient.EndPoint=[Windows.Point]::new(1,1)
+    $accentGradient.GradientStops.Add([Windows.Media.GradientStop]::new($accent,0)); $accentGradient.GradientStops.Add([Windows.Media.GradientStop]::new($accentDark,1))
+    $targetWindow.Background=$gradient; $targetWindow.Foreground=New-SoundLiftBrush $palette.Primary; $targetWindow.FontFamily='Segoe UI'
+    $targetWindow.Resources['PageGradient']=$gradient; $targetWindow.Resources['AccentGradient']=$accentGradient
+    foreach($entry in @{AccentText=$palette.Accent;Hover=$palette.Hover;Surface=$palette.Surface;SurfaceAlt=$palette.SurfaceAlt;Control=$palette.Control;Border=$palette.Border;PrimaryText=$palette.Primary;SecondaryText=$palette.Secondary;MutedText=$palette.Muted;SectionText=$palette.Section;AccentContrast=$palette.Contrast}.GetEnumerator()) { $targetWindow.Resources[($entry.Key+'Brush')] = New-SoundLiftBrush ([string]$entry.Value) }
+    if ($targetWindow.Owner) { $targetWindow.WindowStartupLocation='CenterOwner' }
+    if ($targetWindow.Width -gt 0) { $targetWindow.MinWidth=[Math]::Min($targetWindow.Width,420) }
+    if ($targetWindow.Height -gt 0) { $targetWindow.MinHeight=[Math]::Min($targetWindow.Height,220) }
+    $targetWindow.MaxHeight=[Windows.SystemParameters]::WorkArea.Height-32; $targetWindow.MaxWidth=[Windows.SystemParameters]::WorkArea.Width-32
+    $themeIconPath=Join-Path $script:appDirectory 'SoundLift.ico';if(Test-Path -LiteralPath $themeIconPath){try{$targetWindow.Icon=[Windows.Media.Imaging.BitmapFrame]::Create([Uri]$themeIconPath)}catch{}}
+    $targetWindow.Add_SourceInitialized({try{$handle=[Windows.Interop.WindowInteropHelper]::new($targetWindow).Handle;$dark=1;[void][AudioAppNative]::DwmSetWindowAttribute($handle,20,[ref]$dark,4)}catch{}}.GetNewClosure())
+    $targetWindow.Add_ContentRendered({ Set-SoundLiftElementTheme $targetWindow.Content (Get-SoundLiftThemePalette) }.GetNewClosure())
+}
+
+function Show-SoundLiftMessage {
+    param([string]$Message,[string]$Title='SoundLift',[ValidateSet('OK','YesNo')][string]$Buttons='OK',[ValidateSet('Information','Warning','Error','Question')][string]$Icon='Information',[Windows.Window]$Owner=$null)
+    $palette=Get-SoundLiftThemePalette; $dialog=[Windows.Window]::new(); $dialog.Title=$Title; $dialog.Width=560; $dialog.Height=[Math]::Min(460,[Math]::Max(250,210+([Math]::Ceiling($Message.Length/58)*22)))
+    $dialog.ResizeMode='NoResize'; $dialog.ShowInTaskbar=$false; if($Owner){$dialog.Owner=$Owner}; Set-SoundLiftWindowStyle $dialog
+    $root=[Windows.Controls.Grid]::new(); $root.Margin=[Windows.Thickness]::new(26); $root.RowDefinitions.Add([Windows.Controls.RowDefinition]::new()); $buttonRow=[Windows.Controls.RowDefinition]::new();$buttonRow.Height=[Windows.GridLength]::Auto;$root.RowDefinitions.Add($buttonRow)
+    $card=[Windows.Controls.Border]::new();$card.Background=New-SoundLiftBrush $palette.Surface;$card.BorderBrush=New-SoundLiftBrush $palette.Border;$card.BorderThickness=[Windows.Thickness]::new(1);$card.CornerRadius=[Windows.CornerRadius]::new(16);$card.Padding=[Windows.Thickness]::new(20)
+    $body=[Windows.Controls.StackPanel]::new();$heading=[Windows.Controls.TextBlock]::new();$heading.Text=switch($Icon){'Error'{'Hiba'}'Warning'{'Figyelmeztetés'}'Question'{'Megerősítés'}default{'Információ'}};$heading.FontSize=12;$heading.FontWeight='Bold';$heading.Foreground=New-SoundLiftBrush $(switch($Icon){'Error'{$palette.Danger}'Warning'{$palette.Warning}default{$palette.Accent}})
+    $text=[Windows.Controls.TextBlock]::new();$text.Text=$Message;$text.TextWrapping='Wrap';$text.FontSize=14;$text.LineHeight=22;$text.Foreground=New-SoundLiftBrush $palette.Primary;$text.Margin=[Windows.Thickness]::new(0,10,0,0);[void]$body.Children.Add($heading);[void]$body.Children.Add($text);$card.Child=$body;$scroll=[Windows.Controls.ScrollViewer]::new();$scroll.VerticalScrollBarVisibility='Auto';$scroll.HorizontalScrollBarVisibility='Disabled';$scroll.Content=$card;[void]$root.Children.Add($scroll)
+    $actions=[Windows.Controls.StackPanel]::new();$actions.Orientation='Horizontal';$actions.HorizontalAlignment='Right';$actions.Margin=[Windows.Thickness]::new(0,18,0,0);[Windows.Controls.Grid]::SetRow($actions,1)
+    $dialog.Tag=[Windows.MessageBoxResult]::None
+    if($Buttons -eq 'YesNo'){$no=[Windows.Controls.Button]::new();$no.Content='Nem';$no.Width=110;$no.Margin=[Windows.Thickness]::new(0,0,10,0);$no.Add_Click({$dialog.Tag=[Windows.MessageBoxResult]::No;$dialog.DialogResult=$false}.GetNewClosure());[void]$actions.Children.Add($no);$yes=[Windows.Controls.Button]::new();$yes.Content='Igen';$yes.Width=120;$yes.Tag='PrimaryAction';$yes.Background=$dialog.Resources['AccentGradient'];$yes.Foreground=$dialog.Resources['AccentContrastBrush'];$yes.Add_Click({$dialog.Tag=[Windows.MessageBoxResult]::Yes;$dialog.DialogResult=$true}.GetNewClosure());[void]$actions.Children.Add($yes)}else{$ok=[Windows.Controls.Button]::new();$ok.Content='Rendben';$ok.Width=120;$ok.Tag='PrimaryAction';$ok.Background=$dialog.Resources['AccentGradient'];$ok.Foreground=$dialog.Resources['AccentContrastBrush'];$ok.IsDefault=$true;$ok.Add_Click({$dialog.Tag=[Windows.MessageBoxResult]::OK;$dialog.DialogResult=$true}.GetNewClosure());[void]$actions.Children.Add($ok)}
+    [void]$root.Children.Add($actions);$dialog.Content=$root;[void]$dialog.ShowDialog();return [Windows.MessageBoxResult]$dialog.Tag
+}
 
 function ConvertTo-SoundLiftSafeText([object]$value, [int]$maxLength = 1000) {
     if ($null -eq $value) { return '' }
@@ -454,13 +558,13 @@ function Confirm-DiscordAccountLink {
             return $true
         }
         Write-SoundLiftLog -Category security -EventName 'discord_link_check_failed' -Severity error -ErrorRecord $_
-        [System.Windows.MessageBox]::Show('A Discord-összekapcsolás ellenőrzése sikertelen. Helyi alkalmazáshiba vagy szerverkapcsolati hiba is okozhatja. A részletek a SoundLift logs mappájában találhatók.', 'SoundLift – Discord ellenőrzés', 'OK', 'Error') | Out-Null
+        Show-SoundLiftMessage 'A Discord-összekapcsolás ellenőrzése sikertelen. Helyi alkalmazáshiba vagy szerverkapcsolati hiba is okozhatja. A részletek a SoundLift logs mappájában találhatók.' 'SoundLift – Discord ellenőrzés' 'OK' 'Error' | Out-Null
         return $false
     }
 
     Write-SoundLiftLog -Category security -EventName 'discord_link_required' -Severity warning
     $dialog = [Windows.Window]::new(); $dialog.Title='SoundLift – Discord összekapcsolás'; $dialog.Width=610; $dialog.Height=430
-    $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterScreen'; $dialog.Background='#09090B'; $dialog.Foreground='#F8FAFC'
+    $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterScreen'; Set-SoundLiftWindowStyle $dialog
     $root=[Windows.Controls.StackPanel]::new(); $root.Margin=[Windows.Thickness]::new(30)
     $title=[Windows.Controls.TextBlock]::new(); $title.Text='Discord-fiók összekapcsolása'; $title.FontSize=24; $title.FontWeight='Bold'
     $info=[Windows.Controls.TextBlock]::new(); $info.Text="A SoundLift használatához hitelesítened kell a Discord-fiókodat.`nA kapcsolat a frissítések után is megmarad."; $info.TextWrapping='Wrap'; $info.Margin=[Windows.Thickness]::new(0,14,0,12); $info.Foreground='#CBD5E1'
@@ -568,7 +672,7 @@ function Set-LicenseResponse([object]$response, [switch]$Persist, [string]$licen
 
 function Show-LicenseKeyDialog {
     $dialog = [Windows.Window]::new(); $dialog.Title = 'SoundLift – Licencaktiválás'; $dialog.Width = 560; $dialog.Height = 350
-    $dialog.ResizeMode = 'NoResize'; $dialog.WindowStartupLocation = 'CenterOwner'; $dialog.Owner=$window; $dialog.Background = '#09090B'; $dialog.Foreground = '#F8FAFC'
+    $dialog.ResizeMode = 'NoResize'; $dialog.WindowStartupLocation = 'CenterOwner'; $dialog.Owner=$window; Set-SoundLiftWindowStyle $dialog
     $root = [Windows.Controls.StackPanel]::new(); $root.Margin = [Windows.Thickness]::new(28)
     $title = [Windows.Controls.TextBlock]::new(); $title.Text = 'Vásárlói licenc aktiválása'; $title.FontSize = 23; $title.FontWeight = 'Bold'
     $info = [Windows.Controls.TextBlock]::new(); $info.Text = "Írd be a vásárláskor kapott licenckulcsot.`nA kulcs az első sikeres aktiváláskor ehhez a számítógéphez kapcsolódik."; $info.TextWrapping = 'Wrap'; $info.Margin = [Windows.Thickness]::new(0,12,0,16); $info.Foreground = '#CBD5E1'
@@ -635,7 +739,7 @@ function Confirm-SoundLiftLicense {
             Write-SoundLiftLog -Category security -EventName 'license_rejected' -Severity warning -Data @{ code=$failureCode }
         }
         if (-not $PromptForKey) { Remove-LicenseState }
-        [System.Windows.MessageBox]::Show(([string]$response.message), 'A licenc nem használható', 'OK', 'Warning') | Out-Null
+        Show-SoundLiftMessage ([string]$response.message) 'A licenc nem használható' 'OK' 'Warning' $window | Out-Null
         return (-not $PromptForKey -and $script:licenseMode -eq 'universal')
     } catch {
         # Rövid internetkimaradásnál 72 órás, DPAPI-val védett türelmi idő.
@@ -651,7 +755,7 @@ function Confirm-SoundLiftLicense {
         }
         Write-SoundLiftLog -Category license -EventName 'validation_unavailable' -Severity error -ErrorRecord $_
         if ($PromptForKey -or $script:licenseMode -eq 'custom') {
-            [System.Windows.MessageBox]::Show("A licenc most nem ellenőrizhető, és nincs érvényes offline időszak.`n`n$($_.Exception.Message)", 'Licencellenőrzési hiba', 'OK', 'Error') | Out-Null
+            Show-SoundLiftMessage "A licenc most nem ellenőrizhető, és nincs érvényes offline időszak.`n`n$($_.Exception.Message)" 'Licencellenőrzési hiba' 'OK' 'Error' $window | Out-Null
         }
         if (-not $PromptForKey) { $script:currentLicenseType = 'free' }
         return (-not $PromptForKey -and $script:licenseMode -eq 'universal')
@@ -675,7 +779,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.4.7" Width="1180" Height="840" MinWidth="1000" MinHeight="720"
+        Title="SoundLift V1.5.0" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -747,6 +851,16 @@ $xaml = @'
     <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource UtilityButton}">
       <Setter Property="Foreground" Value="#FF7A8A"/><Setter Property="Background" Value="#241014"/>
       <Setter Property="BorderBrush" Value="#5A2029"/><Setter Property="Padding" Value="16,10"/>
+    </Style>
+    <Style TargetType="TextBox">
+      <Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="13"/>
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/><Setter Property="Background" Value="{DynamicResource ControlBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="11,8"/><Setter Property="CaretBrush" Value="{DynamicResource AccentTextBrush}"/>
+    </Style>
+    <Style TargetType="ListBox">
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/><Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Padding" Value="6"/>
     </Style>
     <Style TargetType="CheckBox">
       <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/><Setter Property="FontSize" Value="13"/>
@@ -835,12 +949,12 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.4.7" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.5.0" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
-      <Border Name="StatusBorder" Grid.Column="1" Background="#171719" CornerRadius="13" Padding="16,11" BorderBrush="#303035" BorderThickness="1">
+      <Border Name="StatusBorder" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="15" Padding="17,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
         <StackPanel>
-          <TextBlock Name="StatusText" Text="A hangrendszer ellenőrzése folyamatban…" FontSize="13" FontWeight="SemiBold" Foreground="#F8FAFC"/>
-          <TextBlock Name="DeviceText" Text="Aktív hangkimenet észlelése…" FontSize="12" Foreground="#8B9BB4" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+          <TextBlock Name="StatusText" Text="A hangrendszer ellenőrzése folyamatban…" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/>
+          <TextBlock Name="DeviceText" Text="Aktív hangkimenet észlelése…" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
         </StackPanel>
       </Border>
     </Grid>
@@ -922,10 +1036,10 @@ $xaml = @'
                 </Style>
               </ComboBox.Resources>
             </ComboBox>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.4.7" Foreground="#64748B" FontSize="11" Margin="4,0,0,6"/>
-            <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="#94A3B8" FontSize="11" Margin="4,0,0,4"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.5.0" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
-            <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="#94A3B8" FontSize="11" Margin="4,5,0,4"/>
+            <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,5,0,4"/>
             <Button Name="LicenseButton" Content="◇  Licenc kezelése" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="ActiveProfileText" Text="Aktív profil: Egyéni" Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold" FontSize="12" Margin="4,0,0,10"/>
             <Button Name="AboutButton" Content="ⓘ  A SoundLiftről és Discord" Style="{StaticResource UtilityButton}"/>
@@ -943,12 +1057,12 @@ $xaml = @'
               <StackPanel>
                 <DockPanel><TextBlock Text="Hangerő erősítése" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/><TextBlock Name="VolumeValue" Text="100%" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Right"/></DockPanel>
                 <Slider Name="VolumeSlider" Minimum="0" Maximum="300" Value="100" TickFrequency="5" IsSnapToTickEnabled="True"/>
-                <TextBlock Text="0% = némítás  •  100% = eredeti hangerő  •  maximum 300%" FontSize="11" Foreground="#64748B"/>
+                <TextBlock Text="0% = némítás  •  100% = eredeti hangerő  •  maximum 300%" FontSize="11" Foreground="{DynamicResource MutedTextBrush}"/>
               </StackPanel>
               <StackPanel Grid.Column="2">
                 <DockPanel><TextBlock Text="Mélyhangkiemelés" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/><TextBlock Name="BassValue" Text="6 dB" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Right"/></DockPanel>
                 <Slider Name="BassSlider" Minimum="0" Maximum="24" Value="6" TickFrequency="1" IsSnapToTickEnabled="True"/>
-                <TextBlock Text="A basszus ereje 0 és 24 dB között" FontSize="11" Foreground="#64748B"/>
+                <TextBlock Text="A basszus ereje 0 és 24 dB között" FontSize="11" Foreground="{DynamicResource MutedTextBrush}"/>
               </StackPanel>
             </Grid>
           </Border>
@@ -971,7 +1085,7 @@ $xaml = @'
                 <TextBlock Text="ÉLŐ HANGMÉRŐ" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                   <TextBlock Name="LiveBoostText" Text="Erősítés: 0,0 dB" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="0,0,14,0"/>
-                  <TextBlock Name="LiveClipText" Text="NINCS JEL" Foreground="#64748B" FontSize="11" FontWeight="Bold"/>
+                  <TextBlock Name="LiveClipText" Text="NINCS JEL" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" FontWeight="Bold"/>
                 </StackPanel>
               </DockPanel>
               <Grid Grid.Row="1" Margin="0,0,0,7">
@@ -1015,7 +1129,7 @@ $xaml = @'
             <StackPanel>
               <DockPanel Margin="0,0,0,10">
                 <TextBlock Text="10 SÁVOS HANGSZÍNSZABÁLYZÓ" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}"/>
-                <TextBlock Text="-12 dB  •  +12 dB" HorizontalAlignment="Right" Foreground="#64748B" FontSize="11"/>
+                <TextBlock Text="-12 dB  •  +12 dB" HorizontalAlignment="Right" Foreground="{DynamicResource MutedTextBrush}" FontSize="11"/>
               </DockPanel>
               <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="12" Padding="12">
                 <UniformGrid Name="EqPanel" Rows="1" Columns="10"/>
@@ -1097,7 +1211,7 @@ $window.Dispatcher.Add_UnhandledException({
             script_stack=$eventArgs.Exception.StackTrace
         }
         [void](Send-SoundLiftPendingLogs)
-        [System.Windows.MessageBox]::Show("A SoundLift váratlan hibát észlelt, ezért biztonságosan bezárul.`nA részletes napló itt található:`n$script:logRoot", 'SoundLift – hiba', 'OK', 'Error') | Out-Null
+        Show-SoundLiftMessage "A SoundLift váratlan hibát észlelt, ezért biztonságosan bezárul.`nA részletes napló itt található:`n$script:logRoot" 'SoundLift – hiba' 'OK' 'Error' $window | Out-Null
     } catch { }
     $eventArgs.Handled = $true
     $script:reallyExit = $true
@@ -1113,7 +1227,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.4.7'
+$script:trayIcon.Text = 'SoundLift V1.5.0'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -1129,7 +1243,7 @@ $CopySupportIdButton.Add_Click({
     try {
         [Windows.Forms.Clipboard]::SetText((Get-SoundLiftSupportId))
         $StatusText.Text = 'Támogatási ID a vágólapra másolva'
-    } catch { [System.Windows.MessageBox]::Show('A támogatási ID most nem másolható a vágólapra.', 'SoundLift', 'OK', 'Warning') | Out-Null }
+    } catch { Show-SoundLiftMessage 'A támogatási ID most nem másolható a vágólapra.' 'SoundLift' 'OK' 'Warning' $window | Out-Null }
 })
 
 $script:eqBands = @(31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000)
@@ -1156,16 +1270,7 @@ for ($i = 0; $i -lt $script:eqBands.Count; $i++) {
 }
 
 function Set-AppTheme([string]$themeName) {
-    $theme = switch ($themeName) {
-        { $_ -in @('Fekete és kék','Black & Blue') }     { @{ Accent='#22A7FF'; AccentDark='#0057B8'; Page='#071521'; Hover='#102D42' } }
-        { $_ -in @('Grafit és zöld','Graphite & Green') } { @{ Accent='#35D07F'; AccentDark='#087443'; Page='#092018'; Hover='#123526' } }
-        'Fekete és lila'    { @{ Accent='#A855F7'; AccentDark='#6D28D9'; Page='#180A25'; Hover='#32184A' } }
-        'Éjkék és türkiz'   { @{ Accent='#22D3EE'; AccentDark='#0E7490'; Page='#061C2A'; Hover='#103746' } }
-        'Grafit és narancs' { @{ Accent='#FB923C'; AccentDark='#C2410C'; Page='#241307'; Hover='#422414'; Contrast='#111113' } }
-        'Fekete és arany'   { @{ Accent='#F5C451'; AccentDark='#A16207'; Page='#211804'; Hover='#3B2D10'; Contrast='#111113' } }
-        'OLED fekete'       { @{ Accent='#F8FAFC'; AccentDark='#64748B'; Page='#000000'; Hover='#202024'; Base='#000000'; Surface='#050505'; SurfaceAlt='#000000'; Control='#101012'; Border='#29292E'; Contrast='#09090B' } }
-        default            { @{ Accent='#FF4057'; AccentDark='#8B0017'; Page='#20090B'; Hover='#3A1016' } }
-    }
+    $theme = Get-SoundLiftThemePalette $themeName
 
     $accentColor = [Windows.Media.ColorConverter]::ConvertFromString($theme.Accent)
     $accentDarkColor = [Windows.Media.ColorConverter]::ConvertFromString($theme.AccentDark)
@@ -1189,13 +1294,7 @@ function Set-AppTheme([string]$themeName) {
 
     $window.Resources['AccentTextBrush'] = [Windows.Media.SolidColorBrush]::new($accentColor)
     $window.Resources['HoverBrush'] = [Windows.Media.SolidColorBrush]::new([Windows.Media.ColorConverter]::ConvertFromString($theme.Hover))
-    $palette = @{
-        Surface=$(if($theme.Surface){$theme.Surface}else{'#111113'}); SurfaceAlt=$(if($theme.SurfaceAlt){$theme.SurfaceAlt}else{'#0B0B0D'})
-        Control=$(if($theme.Control){$theme.Control}else{'#17171B'}); Border=$(if($theme.Border){$theme.Border}else{'#29292E'})
-        Primary=$(if($theme.Primary){$theme.Primary}else{'#F8FAFC'}); Secondary=$(if($theme.Secondary){$theme.Secondary}else{'#CBD5E1'})
-        Muted=$(if($theme.Muted){$theme.Muted}else{'#64748B'}); Section=$(if($theme.Section){$theme.Section}else{'#9A7C80'})
-        Contrast=$(if($theme.Contrast){$theme.Contrast}else{'#FFFFFF'})
-    }
+    $palette = $theme
     foreach($entry in $palette.GetEnumerator()) { $window.Resources[($entry.Key + 'Brush')] = [Windows.Media.SolidColorBrush]::new([Windows.Media.ColorConverter]::ConvertFromString([string]$entry.Value)) }
     foreach ($label in $script:eqValueLabels) { $label.Foreground = $window.Resources['AccentTextBrush'] }
     foreach ($label in $script:eqBandLabels) { $label.Foreground = $window.Resources['MutedTextBrush'] }
@@ -1216,11 +1315,11 @@ $script:themeNames = @(
     'Fekete és arany', 'OLED fekete'
 )
 foreach ($themeName in $script:themeNames) { [void]$ThemeCombo.Items.Add($themeName) }
-$ThemeCombo.SelectedIndex = 0
+$ThemeCombo.SelectedItem = $script:themeName
 $ThemeCombo.Add_SelectionChanged({
     if ($ThemeCombo.SelectedItem) { Set-AppTheme ([string]$ThemeCombo.SelectedItem) }
 })
-Set-AppTheme 'Fekete és piros'
+Set-AppTheme $script:themeName
 
 function Set-EqValues([double[]]$values) {
     for ($i = 0; $i -lt $script:eqSliders.Count; $i++) { $script:eqSliders[$i].Value = $values[$i] }
@@ -1329,7 +1428,7 @@ function Apply-ProfileLayout {
 }
 
 function Show-ProfileOrderEditor {
-    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Profilok rendezése';$dialog.Width=500;$dialog.Height=590;$dialog.ResizeMode='NoResize';$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;$dialog.Background='#09090B';$dialog.Foreground='#F8FAFC'
+    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Profilok rendezése';$dialog.Width=520;$dialog.Height=620;$dialog.ResizeMode='NoResize';$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;Set-SoundLiftWindowStyle $dialog
     $root=[Windows.Controls.Grid]::new();$root.Margin=[Windows.Thickness]::new(24);$root.RowDefinitions.Add([Windows.Controls.RowDefinition]::new());$actions=[Windows.Controls.RowDefinition]::new();$actions.Height=[Windows.GridLength]::Auto;$root.RowDefinitions.Add($actions)
     $panel=[Windows.Controls.StackPanel]::new();$title=[Windows.Controls.TextBlock]::new();$title.Text='Profilok rendezése';$title.FontSize=23;$title.FontWeight='Bold';$title.Foreground=$window.Resources['AccentTextBrush'];[void]$panel.Children.Add($title)
     $hint=[Windows.Controls.TextBlock]::new();$hint.Text='A Zene mindig legfelül marad. A többi profilt fel-le mozgathatod vagy elrejtheted.';$hint.TextWrapping='Wrap';$hint.Foreground='#94A3B8';$hint.Margin=[Windows.Thickness]::new(0,5,0,14);[void]$panel.Children.Add($hint)
@@ -1390,11 +1489,11 @@ $ApplyButton.Add_Click({
     try {
         $apoDirectory = Get-ApoConfigDirectory
         if (-not $apoDirectory) {
-            [System.Windows.MessageBox]::Show("Előbb telepítsd az Equalizer APO-t, majd indítsd újra az appot.`n`nA pontos lépéseket a TELEPÍTÉS.txt tartalmazza.", 'SoundLift', 'OK', 'Warning') | Out-Null
+            Show-SoundLiftMessage "Előbb telepítsd az Equalizer APO-t, majd indítsd újra az appot.`n`nA pontos lépéseket a TELEPÍTÉS.txt tartalmazza." 'SoundLift' 'OK' 'Warning' $window | Out-Null
             return
         }
         if (-not (Test-Administrator)) {
-            $answer = [System.Windows.MessageBox]::Show('A beállítás mentéséhez rendszergazdai jogosultság kell. Újraindítsam az appot rendszergazdaként?', 'SoundLift', 'YesNo', 'Question')
+            $answer = Show-SoundLiftMessage 'A beállítás mentéséhez rendszergazdai jogosultság kell. Újraindítsam az appot rendszergazdaként?' 'SoundLift' 'YesNo' 'Question' $window
             if ($answer -eq 'Yes') {
                 Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
                 $window.Close()
@@ -1409,7 +1508,7 @@ $ApplyButton.Add_Click({
         $maxEqGain = 0.0
         foreach ($eqSlider in $script:eqSliders) { if ([double]$eqSlider.Value -gt $maxEqGain) { $maxEqGain = [double]$eqSlider.Value } }
         if ((-not $SafetyCheck.IsChecked) -and ($volumePercent -gt 200 -or $bassDb -gt 15)) {
-            $warning = [System.Windows.MessageBox]::Show('Ez a beállítás torzíthat, károsíthatja a hangszórót és a hallásodat. Biztosan alkalmazod védelem nélkül?', 'Nagyon erős beállítás', 'YesNo', 'Warning')
+            $warning = Show-SoundLiftMessage 'Ez a beállítás torzíthat, károsíthatja a hangszórót és a hallásodat. Biztosan alkalmazod védelem nélkül?' 'Nagyon erős beállítás' 'YesNo' 'Warning' $window
             if ($warning -ne 'Yes') { return }
         }
         # Reserve headroom for both the volume preamp and overlapping bass filters.
@@ -1468,7 +1567,7 @@ $ApplyButton.Add_Click({
         $StatusBorder.Background = '#143126'
     } catch {
         Write-SoundLiftLog -Category crash -EventName 'handled_runtime_error' -Severity error -Data @{ component='apply_audio_config' } -ErrorRecord $_
-        [System.Windows.MessageBox]::Show("Nem sikerült menteni:`n$($_.Exception.Message)", 'SoundLift – hiba', 'OK', 'Error') | Out-Null
+        Show-SoundLiftMessage "Nem sikerült menteni:`n$($_.Exception.Message)" 'SoundLift – hiba' 'OK' 'Error' $window | Out-Null
     } finally {
         $script:applyBusy = $false
     }
@@ -1661,7 +1760,7 @@ function Show-DiagnosticsWindow {
     $dialog.Title = "SoundLift $script:appVersion – Diagnosztika"
     $dialog.Width = 760; $dialog.Height = 590; $dialog.MinWidth = 620; $dialog.MinHeight = 440
     $dialog.WindowStartupLocation = 'CenterOwner'; $dialog.Owner = $window
-    $dialog.Background = [Windows.Media.SolidColorBrush]::new([Windows.Media.ColorConverter]::ConvertFromString('#0B0B0D'))
+    Set-SoundLiftWindowStyle $dialog
 
     $grid = [Windows.Controls.Grid]::new()
     $grid.Margin = [Windows.Thickness]::new(18)
@@ -1699,7 +1798,7 @@ function Show-DiagnosticsWindow {
         if ($copied) {
             $StatusText.Text = 'A diagnosztikai jelentés a vágólapra került'
         } else {
-            [System.Windows.MessageBox]::Show('A Windows vágólapja jelenleg foglalt. Zárd be a vágólapot használó programot, majd próbáld újra.', 'Másolási hiba', 'OK', 'Warning') | Out-Null
+            Show-SoundLiftMessage 'A Windows vágólapja jelenleg foglalt. Zárd be a vágólapot használó programot, majd próbáld újra.' 'Másolási hiba' 'OK' 'Warning' $dialog | Out-Null
         }
     }.GetNewClosure())
     $saveButton.Add_Click({
@@ -1728,7 +1827,7 @@ function Repair-SoundLiftApoInclude {
         if ($mainText -match '(?im)^\s*Include:\s*SoundLift\.txt\s*$') {
             $StatusText.Text = 'Az APO-kapcsolat már megfelelő, nincs szükség javításra'
             $StatusBorder.Background = '#143126'
-            [System.Windows.MessageBox]::Show('Nincs szükség javításra: a SoundLift Include sora már megfelelő.', 'SoundLift – APO javítás', 'OK', 'Information') | Out-Null
+            Show-SoundLiftMessage 'Nincs szükség javításra: a SoundLift Include sora már megfelelő.' 'SoundLift – APO javítás' 'OK' 'Information' $window | Out-Null
             return
         }
 
@@ -1744,17 +1843,17 @@ function Repair-SoundLiftApoInclude {
         $StatusText.Text = 'Az APO-kapcsolat sikeresen helyreállt'
         $StatusBorder.Background = '#143126'
         Write-SoundLiftLog -Category startup -EventName 'apo_include_repaired' -Data @{ result='success' }
-        [System.Windows.MessageBox]::Show("A SoundLift Include sora sikeresen helyreállt.`n`nAz eredeti config.txt biztonsági mentése is elkészült.", 'SoundLift – APO javítás', 'OK', 'Information') | Out-Null
+        Show-SoundLiftMessage "A SoundLift Include sora sikeresen helyreállt.`n`nAz eredeti config.txt biztonsági mentése is elkészült." 'SoundLift – APO javítás' 'OK' 'Information' $window | Out-Null
     } catch {
         Write-SoundLiftLog -Category crash -EventName 'handled_runtime_error' -Severity error -Data @{ component='apo_include_repair' } -ErrorRecord $_
         $StatusText.Text = "Az APO-kapcsolat nem javítható: $($_.Exception.Message)"
         $StatusBorder.Background = '#4A1F2D'
-        [System.Windows.MessageBox]::Show("A javítás nem sikerült:`n$($_.Exception.Message)", 'SoundLift – APO javítás', 'OK', 'Error') | Out-Null
+        Show-SoundLiftMessage "A javítás nem sikerült:`n$($_.Exception.Message)" 'SoundLift – APO javítás' 'OK' 'Error' $window | Out-Null
     }
 }
 
 $RepairApoButton.Add_Click({
-    $answer = [System.Windows.MessageBox]::Show('A SoundLift ellenőrzi és szükség esetén kijavítja az Equalizer APO Include sorát. Folytatod?', 'SoundLift – APO automatikus javítás', 'YesNo', 'Question')
+    $answer = Show-SoundLiftMessage 'A SoundLift ellenőrzi és szükség esetén kijavítja az Equalizer APO Include sorát. Folytatod?' 'SoundLift – APO automatikus javítás' 'YesNo' 'Question' $window
     if ($answer -eq 'Yes') { Repair-SoundLiftApoInclude }
 })
 
@@ -1772,7 +1871,7 @@ function Show-ProblemReportWindow {
     $dialog = [Windows.Window]::new(); $dialog.Title = 'SoundLift – Hiba jelentése'
     $dialog.Width = 800; $dialog.Height = 720; $dialog.MinWidth = 680; $dialog.MinHeight = 580
     $dialog.WindowStartupLocation = 'CenterOwner'; $dialog.Owner = $window
-    $dialog.Background = $window.Resources['SurfaceAltBrush']; $dialog.Foreground = $window.Resources['PrimaryTextBrush']
+    Set-SoundLiftWindowStyle $dialog
     $root = [Windows.Controls.Grid]::new(); $root.Margin = [Windows.Thickness]::new(22)
     $auto = [Windows.GridLength]::Auto
     foreach ($height in @($auto,$auto,$auto,$auto,[Windows.GridLength]::new(1,[Windows.GridUnitType]::Star),$auto,$auto)) { $row=[Windows.Controls.RowDefinition]::new(); $row.Height=$height; $root.RowDefinitions.Add($row) }
@@ -1793,7 +1892,7 @@ function Show-ProblemReportWindow {
     $cancel.Add_Click({ $dialog.Close() }.GetNewClosure())
     $send.Add_Click({
         if (-not (Test-SoundLiftProblemReportService)) {
-            [System.Windows.MessageBox]::Show('A hibajelentő szolgáltatás nincs beállítva ebben a példányban. Telepítsd a hivatalos SoundLift-verziót, majd próbáld újra.', 'SoundLift – Hiba jelentése', 'OK', 'Warning') | Out-Null
+            Show-SoundLiftMessage 'A hibajelentő szolgáltatás nincs beállítva ebben a példányban. Telepítsd a hivatalos SoundLift-verziót, majd próbáld újra.' 'SoundLift – Hiba jelentése' 'OK' 'Warning' $dialog | Out-Null
             return
         }
         $send.IsEnabled=$false; $send.Content='Küldés folyamatban…'; [Windows.Forms.Application]::DoEvents()
@@ -1806,10 +1905,10 @@ function Show-ProblemReportWindow {
             $StatusBorder.Background = if ($sent) { '#143126' } else { '#4A3514' }
             $dialog.Close()
             $resultText = if ($sent) { 'A jelentést sikeresen elküldtük.' } else { 'A jelentést biztonságosan elmentettük, és a következő indításkor automatikusan újraküldjük.' }
-            [System.Windows.MessageBox]::Show("$resultText`nTámogatási ID: $(Get-SoundLiftSupportId)", 'SoundLift – Hiba jelentése', 'OK', 'Information') | Out-Null
+            Show-SoundLiftMessage "$resultText`nTámogatási ID: $(Get-SoundLiftSupportId)" 'SoundLift – Hiba jelentése' 'OK' 'Information' $dialog | Out-Null
         } catch {
             $send.IsEnabled=$true; $send.Content='Újrapróbálás'
-            [System.Windows.MessageBox]::Show("A jelentés elküldése nem sikerült:`n$($_.Exception.Message)", 'SoundLift – Hiba jelentése', 'OK', 'Error') | Out-Null
+            Show-SoundLiftMessage "A jelentés elküldése nem sikerült:`n$($_.Exception.Message)" 'SoundLift – Hiba jelentése' 'OK' 'Error' $dialog | Out-Null
         }
     }.GetNewClosure())
     $buttons.Children.Add($cancel)|Out-Null; $buttons.Children.Add($send)|Out-Null
@@ -1853,8 +1952,8 @@ function Restore-SoundLiftPreviousVersion {
         return
     }
     $state = Get-SoundLiftRollbackState
-    if (-not $state) { [System.Windows.MessageBox]::Show('Nem található sértetlen előző verzió.', 'SoundLift – Visszaállítás', 'OK', 'Warning') | Out-Null; return }
-    $answer = [System.Windows.MessageBox]::Show("Biztosan visszaállítod a SoundLift $($state.version) verzióját?`n`nA program újra fog indulni.", 'SoundLift – Előző verzió', 'YesNo', 'Warning')
+    if (-not $state) { Show-SoundLiftMessage 'Nem található sértetlen előző verzió.' 'SoundLift – Visszaállítás' 'OK' 'Warning' $window | Out-Null; return }
+    $answer = Show-SoundLiftMessage "Biztosan visszaállítod a SoundLift $($state.version) verzióját?`n`nA program újra fog indulni." 'SoundLift – Előző verzió' 'YesNo' 'Warning' $window
     if ($answer -ne 'Yes') { return }
     try {
         $targetPath = $script:appLaunchPath
@@ -1864,7 +1963,7 @@ function Restore-SoundLiftPreviousVersion {
         [void](Send-SoundLiftPendingLogs)
         Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile','-NonInteractive','-WindowStyle','Hidden','-EncodedCommand',$encoded -ErrorAction Stop
         $script:reallyExit=$true; $window.Close()
-    } catch { [System.Windows.MessageBox]::Show("A visszaállítás nem indítható el:`n$($_.Exception.Message)", 'SoundLift – Visszaállítás', 'OK', 'Error') | Out-Null }
+    } catch { Show-SoundLiftMessage "A visszaállítás nem indítható el:`n$($_.Exception.Message)" 'SoundLift – Visszaállítás' 'OK' 'Error' $window | Out-Null }
 }
 
 function Show-OwnerLicenseSimulator {
@@ -1875,11 +1974,11 @@ function Show-OwnerLicenseSimulator {
     $saved = Get-SavedLicenseState
     if (-not $saved -or [string]::IsNullOrWhiteSpace([string]$saved.key)) { return }
     try { $targets = Invoke-LicenseApi ([string]$saved.key) 'list_owner_targets' }
-    catch { [System.Windows.MessageBox]::Show("A tesztlicencek most nem kérhetők le.`n`n$($_.Exception.Message)",'SoundLift – Tulajdonosi tesztmód','OK','Error') | Out-Null; return }
+    catch { Show-SoundLiftMessage "A tesztlicencek most nem kérhetők le.`n`n$($_.Exception.Message)" 'SoundLift – Tulajdonosi tesztmód' 'OK' 'Error' $window | Out-Null; return }
     if ($targets.allowed -ne $true -or $targets.is_owner -ne $true) { return }
 
     $dialog=[Windows.Window]::new(); $dialog.Title='SoundLift – Tulajdonosi és fejlesztői tesztmód'; $dialog.Width=590; $dialog.Height=360
-    $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; $dialog.Background='#09090B'; $dialog.Foreground='#F8FAFC'
+    $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; Set-SoundLiftWindowStyle $dialog
     $root=[Windows.Controls.StackPanel]::new(); $root.Margin=[Windows.Thickness]::new(28)
     $title=[Windows.Controls.TextBlock]::new(); $title.Text='Licencjogosultságok szimulálása'; $title.FontSize=23; $title.FontWeight='Bold'
     $info=[Windows.Controls.TextBlock]::new(); $info.Text="A saját tulajdonosi fiókod marad bejelentkezve. A kiválasztás csak a céllicenc funkcióit tölti be teszteléshez; nem lép be a vásárló Discord-fiókjába."; $info.TextWrapping='Wrap'; $info.Foreground='#CBD5E1'; $info.Margin=[Windows.Thickness]::new(0,12,0,16)
@@ -1900,7 +1999,7 @@ function Show-OwnerLicenseSimulator {
     try {
         $response=Invoke-LicenseApi ([string]$saved.key) 'verify' $selection.id
         if($response.allowed -eq $true){Set-LicenseResponse $response; if([string]::IsNullOrWhiteSpace($selection.id)){Set-LicenseResponse $response -Persist -licenseKey ([string]$saved.key)}; Update-DeveloperControls; $StatusText.Text=if($script:simulatedLicenseLabel){"Tulajdonosi tesztmód • $($script:simulatedLicenseLabel)"}else{'Tulajdonosi tesztmód kikapcsolva • saját jogosultságok'}}
-    } catch {[System.Windows.MessageBox]::Show("A tesztmód nem alkalmazható.`n`n$($_.Exception.Message)",'SoundLift – Tulajdonosi tesztmód','OK','Error')|Out-Null}
+    } catch {Show-SoundLiftMessage "A tesztmód nem alkalmazható.`n`n$($_.Exception.Message)" 'SoundLift – Tulajdonosi tesztmód' 'OK' 'Error' $dialog|Out-Null}
 }
 
 $RollbackButton.Visibility = 'Collapsed'; $RollbackButton.IsEnabled = $false
@@ -1912,12 +2011,12 @@ function Show-SoundLiftStatistics {
     $usage=if($total.TotalHours-ge 1){'{0:N1} óra' -f $total.TotalHours}else{'{0} perc' -f [Math]::Round($total.TotalMinutes)}
     $top='Még nincs adat';$topCount=0
     foreach($property in $script:statistics.profiles.PSObject.Properties){if([int64]$property.Value-gt $topCount){$topCount=[int64]$property.Value;$top=Get-SoundLiftProfileDisplayName $property.Name}}
-    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Statisztikák';$dialog.Width=540;$dialog.Height=480;$dialog.ResizeMode='NoResize';$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;$dialog.Background='#09090B';$dialog.Foreground='#F8FAFC'
+    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Statisztikák';$dialog.Width=560;$dialog.Height=500;$dialog.ResizeMode='NoResize';$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;Set-SoundLiftWindowStyle $dialog
     $root=[Windows.Controls.StackPanel]::new();$root.Margin=[Windows.Thickness]::new(26);$title=[Windows.Controls.TextBlock]::new();$title.Text='Használati statisztikák';$title.FontSize=24;$title.FontWeight='Bold';$title.Foreground=$window.Resources['AccentTextBrush'];[void]$root.Children.Add($title)
     $subtitle=[Windows.Controls.TextBlock]::new();$subtitle.Text='Az adatok kizárólag ezen a gépen kerülnek mentésre.';$subtitle.Foreground='#94A3B8';$subtitle.Margin=[Windows.Thickness]::new(0,5,0,18);[void]$root.Children.Add($subtitle)
     foreach($entry in @(@('Teljes használati idő',$usage),@('Indítások',[string]$script:statistics.launches),@('Profilváltások',[string]$script:statistics.profileSwitches),@('Leggyakoribb profil',"$top ($topCount alkalom)"),@('Clipping figyelmeztetések',[string]$script:statistics.clippingWarnings))){$card=[Windows.Controls.Border]::new();$card.Background='#111113';$card.CornerRadius=[Windows.CornerRadius]::new(10);$card.Padding=[Windows.Thickness]::new(13,9,13,9);$card.Margin=[Windows.Thickness]::new(0,0,0,7);$dock=[Windows.Controls.DockPanel]::new();$label=[Windows.Controls.TextBlock]::new();$label.Text=$entry[0];$label.Foreground='#CBD5E1';$value=[Windows.Controls.TextBlock]::new();$value.Text=$entry[1];$value.Foreground=$window.Resources['AccentTextBrush'];$value.FontWeight='Bold';$value.HorizontalAlignment='Right';[void]$dock.Children.Add($label);[void]$dock.Children.Add($value);$card.Child=$dock;[void]$root.Children.Add($card)}
     $actions=[Windows.Controls.StackPanel]::new();$actions.Orientation='Horizontal';$actions.HorizontalAlignment='Right';$actions.Margin=[Windows.Thickness]::new(0,14,0,0)
-    $reset=[Windows.Controls.Button]::new();$reset.Content='Statisztikák nullázása';$reset.Style=$window.Resources['UtilityButton'];$reset.Width=180;$reset.Add_Click({if([System.Windows.MessageBox]::Show('Biztosan törlöd a helyi SoundLift-statisztikákat?','SoundLift','YesNo','Question')-eq'Yes'){$script:statistics=New-SoundLiftStatistics;$script:statistics.launches=1;Save-SoundLiftStatistics;$dialog.Close();$StatusText.Text='Statisztikák nullázva'}}.GetNewClosure())
+    $reset=[Windows.Controls.Button]::new();$reset.Content='Statisztikák nullázása';$reset.Style=$window.Resources['UtilityButton'];$reset.Width=180;$reset.Add_Click({if((Show-SoundLiftMessage 'Biztosan törlöd a helyi SoundLift-statisztikákat?' 'SoundLift' 'YesNo' 'Question' $dialog)-eq'Yes'){$script:statistics=New-SoundLiftStatistics;$script:statistics.launches=1;Save-SoundLiftStatistics;$dialog.Close();$StatusText.Text='Statisztikák nullázva'}}.GetNewClosure())
     $close=[Windows.Controls.Button]::new();$close.Content='Rendben';$close.Style=$window.Resources['PrimaryButton'];$close.Width=110;$close.Add_Click({$dialog.Close()}.GetNewClosure());[void]$actions.Children.Add($reset);[void]$actions.Children.Add($close);[void]$root.Children.Add($actions);$dialog.Content=$root;$dialog.ShowDialog()|Out-Null
 }
 $StatisticsButton.Add_Click({Show-SoundLiftStatistics})
@@ -1925,10 +2024,10 @@ $StatisticsButton.Add_Click({Show-SoundLiftStatistics})
 function Show-DeveloperConsole {
     if($script:currentLicenseType -ne 'developer'){
         Write-SoundLiftLog -Category developer_access -EventName 'developer_console_denied' -Severity warning
-        [System.Windows.MessageBox]::Show('A Fejlesztői konzol kizárólag érvényes fejlesztői licenccel használható.','SoundLift','OK','Warning')|Out-Null;return
+        Show-SoundLiftMessage 'A Fejlesztői konzol kizárólag érvényes fejlesztői licenccel használható.' 'SoundLift' 'OK' 'Warning' $window|Out-Null;return
     }
     Write-SoundLiftLog -Category developer_access -EventName 'developer_console_opened'
-    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Fejlesztői konzol';$dialog.Width=900;$dialog.Height=650;$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;$dialog.Background='#08090B';$dialog.Foreground='#F8FAFC'
+    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Fejlesztői konzol';$dialog.Width=920;$dialog.Height=680;$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;Set-SoundLiftWindowStyle $dialog
     $grid=[Windows.Controls.Grid]::new();$grid.Margin=[Windows.Thickness]::new(20);$grid.RowDefinitions.Add([Windows.Controls.RowDefinition]::new());$bottom=[Windows.Controls.RowDefinition]::new();$bottom.Height=[Windows.GridLength]::Auto;$grid.RowDefinitions.Add($bottom)
     $console=[Windows.Controls.TextBox]::new();$console.IsReadOnly=$true;$console.AcceptsReturn=$true;$console.TextWrapping='NoWrap';$console.VerticalScrollBarVisibility='Auto';$console.HorizontalScrollBarVisibility='Auto';$console.Background='#050505';$console.Foreground='#D1FAE5';$console.FontFamily='Consolas';$console.FontSize=12;$console.Padding=[Windows.Thickness]::new(12)
     $refresh={
@@ -2063,7 +2162,7 @@ Start-Process -FilePath `$applicationPath
 
 function Show-AppUpdateDialog([object]$release, [version]$latestVersion) {
     $dialog=[Windows.Window]::new(); $dialog.Title='SoundLift – Frissítés'; $dialog.Width=550; $dialog.Height=345
-    $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; $dialog.Background='#09090B'; $dialog.Foreground='#F8FAFC'
+    $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; Set-SoundLiftWindowStyle $dialog
     $panel=[Windows.Controls.StackPanel]::new(); $panel.Margin=[Windows.Thickness]::new(28)
     $title=[Windows.Controls.TextBlock]::new(); $title.Text='Új SoundLift-frissítés érhető el'; $title.FontSize=23; $title.FontWeight='Bold'; $title.Foreground='#FF4057'
     $details=[Windows.Controls.TextBlock]::new(); $details.Text="Telepített verzió: $script:appVersion`nÚj verzió: $latestVersion"; $details.FontSize=14; $details.Margin=[Windows.Thickness]::new(0,16,0,14)
@@ -2095,11 +2194,11 @@ function Check-AppUpdate {
             Show-AppUpdateDialog $release $latestVersion
         } elseif (-not $Silent) {
             Write-SoundLiftLog -Category update -EventName 'update_check_succeeded' -Data @{ result='up_to_date'; current_version=$currentVersion }
-            [System.Windows.MessageBox]::Show("A program naprakész.`nTelepített verzió: $currentVersion", 'SoundLift – Frissítés', 'OK', 'Information') | Out-Null
+            Show-SoundLiftMessage "A program naprakész.`nTelepített verzió: $currentVersion" 'SoundLift – Frissítés' 'OK' 'Information' $window | Out-Null
         } else { Write-SoundLiftLog -Category update -EventName 'update_check_succeeded' -Data @{ result='up_to_date'; current_version=$currentVersion } }
     } catch {
         Write-SoundLiftLog -Category update -EventName 'update_check_failed' -Severity warning -ErrorRecord $_
-        if (-not $Silent) { [System.Windows.MessageBox]::Show("A frissítés most nem ellenőrizhető.`n`n$($_.Exception.Message)", 'SoundLift – Frissítés', 'OK', 'Warning') | Out-Null }
+        if (-not $Silent) { Show-SoundLiftMessage "A frissítés most nem ellenőrizhető.`n`n$($_.Exception.Message)" 'SoundLift – Frissítés' 'OK' 'Warning' $window | Out-Null }
     }
 }
 
@@ -2150,7 +2249,7 @@ function Show-PostUpdateResult {
         Write-SoundLiftLog -Category update -EventName 'automatic_update_verified' -Data @{ old_version=$state.from_version; new_version=$script:appVersion; result='success' }
 
         $dialog=[Windows.Window]::new(); $dialog.Title='SoundLift – Frissítés kész'; $dialog.Width=500; $dialog.Height=245
-        $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; $dialog.Background='#09090B'; $dialog.Foreground='#F8FAFC'
+        $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; Set-SoundLiftWindowStyle $dialog
         $panel=[Windows.Controls.StackPanel]::new(); $panel.Margin=[Windows.Thickness]::new(28)
         $title=[Windows.Controls.TextBlock]::new(); $title.Text='✓  A frissítés sikeresen települt'; $title.FontSize=22; $title.FontWeight='Bold'; $title.Foreground='#4ADE80'
         $details=[Windows.Controls.TextBlock]::new(); $details.Text="A SoundLift most már a V$script:appVersion verziót használja.`nMinden beállításod megmaradt."; $details.FontSize=14; $details.LineHeight=22; $details.Margin=[Windows.Thickness]::new(0,18,0,22); $details.Foreground='#CBD5E1'
@@ -2167,7 +2266,7 @@ function Show-AboutWindow {
     $dialog = [Windows.Window]::new()
     $dialog.Title = 'Névjegy – SoundLift'; $dialog.Width = 620; $dialog.Height = 535
     $dialog.ResizeMode = 'NoResize'; $dialog.WindowStartupLocation = 'CenterOwner'; $dialog.Owner = $window
-    $dialog.Background = [Windows.Media.SolidColorBrush]::new([Windows.Media.ColorConverter]::ConvertFromString('#09090B'))
+    Set-SoundLiftWindowStyle $dialog
     if (Test-Path $appIconPath) { try { $dialog.Icon = [Windows.Media.Imaging.BitmapFrame]::Create([Uri]$appIconPath) } catch { } }
 
     $root = [Windows.Controls.Grid]::new(); $root.Margin = [Windows.Thickness]::new(28)
@@ -2189,7 +2288,7 @@ function Show-AboutWindow {
     $actions.ColumnDefinitions.Add([Windows.Controls.ColumnDefinition]::new()); $actions.ColumnDefinitions.Add([Windows.Controls.ColumnDefinition]::new())
     $discordButton = [Windows.Controls.Button]::new(); $discordButton.Content = 'Csatlakozás a Discord-szerverhez'; $discordButton.Height = 46; $discordButton.Margin = [Windows.Thickness]::new(0,0,8,0); $discordButton.Style = $window.Resources['PrimaryButton']
     $closeButton = [Windows.Controls.Button]::new(); $closeButton.Content = 'Bezárás'; $closeButton.Height = 46; $closeButton.Margin = [Windows.Thickness]::new(8,0,0,0); $closeButton.Style = $window.Resources['UtilityButton']
-    $discordButton.Add_Click({ try { Start-Process 'https://discord.gg/h9CaQ47gDT' } catch { [System.Windows.MessageBox]::Show('A Discord-link nem nyitható meg.', 'Névjegy', 'OK', 'Warning') | Out-Null } })
+    $discordButton.Add_Click({ try { Start-Process 'https://discord.gg/h9CaQ47gDT' } catch { Show-SoundLiftMessage 'A Discord-link nem nyitható meg.' 'Névjegy' 'OK' 'Warning' $dialog | Out-Null } })
     $closeButton.Add_Click({ $dialog.Close() }.GetNewClosure())
     $actions.Children.Add($discordButton) | Out-Null; [Windows.Controls.Grid]::SetColumn($closeButton, 1); $actions.Children.Add($closeButton) | Out-Null
     [Windows.Controls.Grid]::SetRow($actions, 1); $root.Children.Add($actions) | Out-Null
@@ -2199,7 +2298,7 @@ $AboutButton.Add_Click({ Show-AboutWindow })
 
 function Show-PrivacyWindow {
     $dialog=[Windows.Window]::new(); $dialog.Title='SoundLift – Adatvédelmi tájékoztató'; $dialog.Width=720; $dialog.Height=650; $dialog.MinWidth=620; $dialog.MinHeight=480
-    $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; $dialog.Background='#09090B'; $dialog.Foreground='#F8FAFC'
+    $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; Set-SoundLiftWindowStyle $dialog
     $root=[Windows.Controls.Grid]::new(); $root.Margin=[Windows.Thickness]::new(24)
     $root.RowDefinitions.Add([Windows.Controls.RowDefinition]::new()); $buttonRow=[Windows.Controls.RowDefinition]::new(); $buttonRow.Height=[Windows.GridLength]::Auto; $root.RowDefinitions.Add($buttonRow)
     $scroll=[Windows.Controls.ScrollViewer]::new(); $scroll.VerticalScrollBarVisibility='Auto'; $scroll.HorizontalScrollBarVisibility='Disabled'
@@ -2241,6 +2340,12 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.5.0 – TELJES FELÜLETI MEGÚJULÁS
+• A főablak tágasabb, egységesebb kártyákat, mezőket és állapotjelzést kapott.
+• Minden SoundLift-ablak automatikusan a kiválasztott téma színeit használja.
+• A régi Windows-üzenetdobozokat modern, saját SoundLift-párbeszédablakok váltották fel.
+• A hosszabb üzenetek tördelve jelennek meg, a gombok és szövegek pedig minden témában kontrasztosak és olvashatók.
+
 V1.4.2 – AUTOMATIKUS INDÍTÁS ÉS TELJES MAGYARÍTÁS
 • A Windowszal történő automatikus indítás mostantól megbízható, emelt jogosultságú ütemezett feladatot használ.
 • A kezelőfelület angol és félrefordított szövegei természetes magyar megfogalmazást kaptak.
@@ -2447,7 +2552,7 @@ V1.0.0 – ELSŐ NYILVÁNOS KIADÁS
     $dialog.Title = "SoundLift $script:appVersion – Frissítési előzmények"
     $dialog.Width = 720; $dialog.Height = 590; $dialog.MinWidth = 560; $dialog.MinHeight = 420
     $dialog.WindowStartupLocation = 'CenterOwner'; $dialog.Owner = $window
-    $dialog.Background = [Windows.Media.SolidColorBrush]::new([Windows.Media.ColorConverter]::ConvertFromString('#09090B'))
+    Set-SoundLiftWindowStyle $dialog
     $grid = [Windows.Controls.Grid]::new(); $grid.Margin = [Windows.Thickness]::new(22)
     $grid.RowDefinitions.Add([Windows.Controls.RowDefinition]::new())
     $buttonRow = [Windows.Controls.RowDefinition]::new(); $buttonRow.Height = [Windows.GridLength]::Auto; $grid.RowDefinitions.Add($buttonRow)
@@ -2466,7 +2571,7 @@ function Show-FirstRunWizard {
     $wizard = [Windows.Window]::new()
     $wizard.Title = 'SoundLift – Első indítás'; $wizard.Width = 650; $wizard.Height = 470
     $wizard.ResizeMode = 'NoResize'; $wizard.WindowStartupLocation = 'CenterOwner'; $wizard.Owner = $window
-    $wizard.Background = [Windows.Media.SolidColorBrush]::new([Windows.Media.ColorConverter]::ConvertFromString('#09090B'))
+    Set-SoundLiftWindowStyle $wizard
     $root = [Windows.Controls.Grid]::new(); $root.Margin = [Windows.Thickness]::new(28)
     $root.RowDefinitions.Add([Windows.Controls.RowDefinition]::new())
     $navRow = [Windows.Controls.RowDefinition]::new(); $navRow.Height = [Windows.GridLength]::Auto; $root.RowDefinitions.Add($navRow)
@@ -2541,7 +2646,7 @@ $ImportButton.Add_Click({
             Set-AppState $state
             $StatusText.Text = 'A profil ellenőrzése és importálása sikerült'
         } catch {
-            [System.Windows.MessageBox]::Show("A profil nem importálható:`n$($_.Exception.Message)", 'Érvénytelen profil', 'OK', 'Warning') | Out-Null
+            Show-SoundLiftMessage "A profil nem importálható:`n$($_.Exception.Message)" 'Érvénytelen profil' 'OK' 'Warning' $window | Out-Null
         }
     }
 })
@@ -2583,7 +2688,7 @@ function Disable-SoundLiftEffects {
 
 function Invoke-SoundLiftBypass([bool]$Confirm = $true) {
     if ($Confirm) {
-        $answer = [System.Windows.MessageBox]::Show('A biztonságos mód kikapcsolja a SoundLift összes hanghatását, és visszaállítja az Equalizer APO eredeti hangját. Folytatod?', 'SoundLift – Biztonságos mód', 'YesNo', 'Warning')
+        $answer = Show-SoundLiftMessage 'A biztonságos mód kikapcsolja a SoundLift összes hanghatását, és visszaállítja az Equalizer APO eredeti hangját. Folytatod?' 'SoundLift – Biztonságos mód' 'YesNo' 'Warning' $window
         if ($answer -ne 'Yes') { return }
     }
     try {
@@ -2592,7 +2697,7 @@ function Invoke-SoundLiftBypass([bool]$Confirm = $true) {
         $StatusText.Text = 'Biztonságos mód aktív • az eredeti hang visszaállítva'; $StatusBorder.Background = '#4A1F2D'
     } catch {
         Write-SoundLiftLog -Category crash -EventName 'handled_runtime_error' -Severity error -Data @{ component='safe_mode' } -ErrorRecord $_
-        [System.Windows.MessageBox]::Show("A biztonságos mód nem kapcsolható be:`n$($_.Exception.Message)", 'SoundLift – hiba', 'OK', 'Error') | Out-Null
+        Show-SoundLiftMessage "A biztonságos mód nem kapcsolható be:`n$($_.Exception.Message)" 'SoundLift – hiba' 'OK' 'Error' $window | Out-Null
     }
 }
 
@@ -2631,10 +2736,10 @@ $DeviceButton.Add_Click({
         } catch {
             $env:QT_QPA_PLATFORM_PLUGIN_PATH = $oldQtPlatformPath
             Write-SoundLiftLog -Category crash -EventName 'handled_runtime_error' -Severity error -Data @{ component='device_selector' } -ErrorRecord $_
-            [System.Windows.MessageBox]::Show("A hangeszközválasztó nem indítható el:`n$($_.Exception.Message)", 'Eszközök') | Out-Null
+            Show-SoundLiftMessage "A hangeszközválasztó nem indítható el:`n$($_.Exception.Message)" 'Eszközök' 'OK' 'Error' $window | Out-Null
         }
     } else {
-        [System.Windows.MessageBox]::Show('Az Equalizer APO eszközválasztó nem található.', 'Eszközök') | Out-Null
+        Show-SoundLiftMessage 'Az Equalizer APO eszközválasztó nem található.' 'Eszközök' 'OK' 'Warning' $window | Out-Null
     }
 })
 
@@ -2804,7 +2909,7 @@ $StartupCheck.Add_Click({
     } catch {
         $StartupCheck.IsChecked = Test-SoundLiftStartupTask
         Write-SoundLiftLog -Category crash -EventName 'handled_runtime_error' -Severity error -Data @{ component='startup_task' } -ErrorRecord $_
-        [System.Windows.MessageBox]::Show("Az automatikus indítás beállítása nem sikerült:`n$($_.Exception.Message)", 'SoundLift – Automatikus indítás', 'OK', 'Error') | Out-Null
+        Show-SoundLiftMessage "Az automatikus indítás beállítása nem sikerült:`n$($_.Exception.Message)" 'SoundLift – Automatikus indítás' 'OK' 'Error' $window | Out-Null
     }
 })
 $DoNotDisturbCheck.Add_Click({
@@ -2816,12 +2921,12 @@ $AppVolumeButton.Add_Click({
         Start-Process 'ms-settings:apps-volume'
         $StatusText.Text='Az alkalmazásonkénti hangerőkeverő megnyitva'
     } catch {
-        [System.Windows.MessageBox]::Show('A Windows alkalmazáshangerő-keverője nem nyitható meg ezen a rendszeren.', 'SoundLift', 'OK', 'Warning') | Out-Null
+        Show-SoundLiftMessage 'A Windows alkalmazáshangerő-keverője nem nyitható meg ezen a rendszeren.' 'SoundLift' 'OK' 'Warning' $window | Out-Null
     }
 })
 
 function Show-MicrophoneEnhancementWindow {
-    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Mikrofonjavítás';$dialog.Width=560;$dialog.Height=510;$dialog.ResizeMode='NoResize';$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;$dialog.Background='#09090B';$dialog.Foreground='#F8FAFC'
+    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Mikrofonjavítás';$dialog.Width=580;$dialog.Height=520;$dialog.ResizeMode='NoResize';$dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$window;Set-SoundLiftWindowStyle $dialog
     $root=[Windows.Controls.StackPanel]::new();$root.Margin=[Windows.Thickness]::new(25)
     $title=[Windows.Controls.TextBlock]::new();$title.Text='Mikrofonjavítás';$title.FontSize=24;$title.FontWeight='Bold';$title.Foreground=$window.Resources['AccentTextBrush'];[void]$root.Children.Add($title)
     $device=[Windows.Controls.TextBlock]::new();$device.Text="Aktív mikrofon: $([AudioAppNative]::GetDefaultInputName())";$device.TextWrapping='Wrap';$device.Foreground='#94A3B8';$device.Margin=[Windows.Thickness]::new(0,5,0,20);[void]$root.Children.Add($device)
@@ -2835,7 +2940,7 @@ function Show-MicrophoneEnhancementWindow {
     $actions=[Windows.Controls.StackPanel]::new();$actions.Orientation='Horizontal';$actions.HorizontalAlignment='Right';$actions.Margin=[Windows.Thickness]::new(0,22,0,0)
     $cancel=[Windows.Controls.Button]::new();$cancel.Content='Mégse';$cancel.Style=$window.Resources['UtilityButton'];$cancel.Width=100;$cancel.Add_Click({$dialog.Close()}.GetNewClosure())
     $apply=[Windows.Controls.Button]::new();$apply.Content='Alkalmazás';$apply.Style=$window.Resources['PrimaryButton'];$apply.Width=130;$apply.Add_Click({
-        if(-not [AudioAppNative]::SetDefaultInputVolumePercent([single]$level.Value)){[System.Windows.MessageBox]::Show('A mikrofon hangerejét nem sikerült beállítani.','SoundLift','OK','Warning')|Out-Null;return}
+        if(-not [AudioAppNative]::SetDefaultInputVolumePercent([single]$level.Value)){Show-SoundLiftMessage 'A mikrofon hangerejét nem sikerült beállítani.' 'SoundLift' 'OK' 'Warning' $dialog|Out-Null;return}
         @{volume=[int]$level.Value;device=[AudioAppNative]::GetDefaultInputName()}|ConvertTo-Json|Set-Content -LiteralPath $microphoneSettingsPath -Encoding UTF8
         $StatusText.Text="Mikrofon hangerő alkalmazva • $([int]$level.Value)%";$dialog.Close()
     }.GetNewClosure());[void]$actions.Children.Add($cancel);[void]$actions.Children.Add($apply);[void]$root.Children.Add($actions);$dialog.Content=$root;$dialog.ShowDialog()|Out-Null
@@ -2966,7 +3071,7 @@ function Test-SoundLiftHotKeyBinding($binding) {
 
 function Show-HotkeyEditor {
     $dialog=[Windows.Window]::new(); $dialog.Title='SoundLift – Billentyűparancsok'; $dialog.Width=620; $dialog.Height=590
-    $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; $dialog.Background='#09090B'; $dialog.Foreground='#F8FAFC'
+    $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; Set-SoundLiftWindowStyle $dialog
     $root=[Windows.Controls.Grid]::new(); $root.Margin=[Windows.Thickness]::new(26)
     $root.RowDefinitions.Add([Windows.Controls.RowDefinition]::new()); $actionsRow=[Windows.Controls.RowDefinition]::new(); $actionsRow.Height=[Windows.GridLength]::Auto; $root.RowDefinitions.Add($actionsRow)
     $panel=[Windows.Controls.StackPanel]::new(); $title=[Windows.Controls.TextBlock]::new(); $title.Text='Billentyűparancsok'; $title.FontSize=23; $title.FontWeight='Bold'; $title.Foreground=$window.Resources['AccentTextBrush']; $title.Margin=[Windows.Thickness]::new(0,0,0,5)
@@ -2988,7 +3093,7 @@ function Show-HotkeyEditor {
             $mods=0; $active=[Windows.Input.Keyboard]::Modifiers
             if($active -band [Windows.Input.ModifierKeys]::Control){$mods=$mods-bor 2};if($active -band [Windows.Input.ModifierKeys]::Alt){$mods=$mods-bor 1};if($active -band [Windows.Input.ModifierKeys]::Shift){$mods=$mods-bor 4};if($active -band [Windows.Input.ModifierKeys]::Windows){$mods=$mods-bor 8}
             $candidate=[PSCustomObject]@{modifiers=$mods;key=[Windows.Input.KeyInterop]::VirtualKeyFromKey($pressedKey)}; $problem=Test-SoundLiftHotKeyBinding $candidate
-            if($problem){[System.Windows.MessageBox]::Show($problem,'Nem használható billentyűparancs','OK','Warning')|Out-Null;$sender.Text=Get-SoundLiftHotKeyText $sender.Tag;return}
+            if($problem){Show-SoundLiftMessage $problem 'Nem használható billentyűparancs' 'OK' 'Warning' $dialog|Out-Null;$sender.Text=Get-SoundLiftHotKeyText $sender.Tag;return}
             $sender.Tag=$candidate;$sender.Text=Get-SoundLiftHotKeyText $candidate
         })
         $clear.Add_Click({param($sender,$eventArgs)$target=$sender.Tag;$target.Tag=[PSCustomObject]@{modifiers=0;key=0};$target.Text='Nincs beállítva'})
@@ -3000,14 +3105,14 @@ function Show-HotkeyEditor {
     $cancel.Add_Click({$dialog.Close()}.GetNewClosure())
     $save.Add_Click({
         $bindings=@($selectors|ForEach-Object{$_.Tag});$activeSignatures=@($bindings|Where-Object{[int]$_.key -ne 0}|ForEach-Object{"$($_.modifiers):$($_.key)"})
-        if ((@($activeSignatures|Select-Object -Unique)).Count -ne $activeSignatures.Count) { [System.Windows.MessageBox]::Show('Ugyanaz a kombináció csak egy parancshoz használható.', 'Billentyűütközés', 'OK', 'Warning')|Out-Null; return }
+        if ((@($activeSignatures|Select-Object -Unique)).Count -ne $activeSignatures.Count) { Show-SoundLiftMessage 'Ugyanaz a kombináció csak egy parancshoz használható.' 'Billentyűütközés' 'OK' 'Warning' $dialog|Out-Null; return }
         $singleKeys=@($bindings|Where-Object{[int]$_.key -ne 0 -and [int]$_.modifiers -eq 0})
         if($singleKeys.Count -gt 0){
-            $answer=[System.Windows.MessageBox]::Show('Önálló billentyűt is beállítottál. Ez gépelés és játék közben is aktiválhatja a hozzárendelt profilt. Biztosan mented?','Önálló gyorsbillentyű','YesNo','Warning')
+            $answer=Show-SoundLiftMessage 'Önálló billentyűt is beállítottál. Ez gépelés és játék közben is aktiválhatja a hozzárendelt profilt. Biztosan mented?' 'Önálló gyorsbillentyű' 'YesNo' 'Warning' $dialog
             if($answer -ne 'Yes'){return}
         }
         $previous=@($script:hotKeyBindings); $script:hotKeyBindings=@($bindings|ForEach-Object{[PSCustomObject]@{modifiers=[int]$_.modifiers;key=[int]$_.key}});$script:hotKeyVirtualKeys=@($script:hotKeyBindings|ForEach-Object{[int]$_.key})
-        try { Register-SoundLiftHotKeys; $dialog.Close(); $StatusText.Text='A billentyűparancsok mentve'; (Get-AppState)|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $settingsPath -Encoding UTF8 } catch { $script:hotKeyBindings=$previous; $script:hotKeyVirtualKeys=@($previous|ForEach-Object{[int]$_.key}); Register-SoundLiftHotKeys; [System.Windows.MessageBox]::Show($_.Exception.Message,'Billentyűütközés','OK','Warning')|Out-Null }
+        try { Register-SoundLiftHotKeys; $dialog.Close(); $StatusText.Text='A billentyűparancsok mentve'; (Get-AppState)|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $settingsPath -Encoding UTF8 } catch { $script:hotKeyBindings=$previous; $script:hotKeyVirtualKeys=@($previous|ForEach-Object{[int]$_.key}); Register-SoundLiftHotKeys; Show-SoundLiftMessage $_.Exception.Message 'Billentyűütközés' 'OK' 'Warning' $dialog|Out-Null }
     }.GetNewClosure())
     [void]$buttons.Children.Add($cancel); [void]$buttons.Children.Add($save); [Windows.Controls.Grid]::SetRow($buttons,1); [void]$root.Children.Add($panel); [void]$root.Children.Add($buttons); $dialog.Content=$root; $dialog.ShowDialog()|Out-Null
 }
@@ -3174,7 +3279,7 @@ $window.Add_ContentRendered({
         Write-SoundLiftLog -Category startup -EventName 'initialization_failed' -Severity critical -ErrorRecord $_
         Write-SoundLiftLog -Category crash -EventName 'startup_crash' -Severity critical -ErrorRecord $_
         [void](Send-SoundLiftPendingLogs)
-        [System.Windows.MessageBox]::Show("A SoundLift indítása közben hiba történt.`nA részletes napló itt található:`n$script:logRoot", 'SoundLift – indítási hiba', 'OK', 'Error') | Out-Null
+        Show-SoundLiftMessage "A SoundLift indítása közben hiba történt.`nA részletes napló itt található:`n$script:logRoot" 'SoundLift – indítási hiba' 'OK' 'Error' $window | Out-Null
         $script:reallyExit = $true; $window.Close()
     }
 })
@@ -3185,5 +3290,5 @@ try {
     Write-SoundLiftLog -Category crash -EventName $eventName -Severity critical -ErrorRecord $_
     if (-not $script:startupCompleted) { Write-SoundLiftLog -Category startup -EventName 'initialization_failed' -Severity critical -ErrorRecord $_ }
     [void](Send-SoundLiftPendingLogs)
-    [System.Windows.MessageBox]::Show("A SoundLift váratlan hibával leállt.`nA jelentés helyileg el lett mentve:`n$script:logRoot", 'SoundLift – hiba', 'OK', 'Error') | Out-Null
+    Show-SoundLiftMessage "A SoundLift váratlan hibával leállt.`nA jelentés helyileg el lett mentve:`n$script:logRoot" 'SoundLift – hiba' 'OK' 'Error' $window | Out-Null
 }
