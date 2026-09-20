@@ -25,7 +25,7 @@ function clean(value: unknown, max: number) {
 }
 
 function cleanMetadata(input: unknown) {
-  const allowed = new Set(["packaged", "stage", "component", "old_version", "new_version", "current_version", "result", "code", "license_type", "grace_hours", "authorization_id", "exception_type", "message", "script_stack", "user_description", "diagnostic_report", "submitted_by_user"]);
+  const allowed = new Set(["packaged", "stage", "component", "old_version", "new_version", "current_version", "result", "code", "license_type", "license_variant", "license_status", "grace_hours", "authorization_id", "build_channel", "customer_build", "server_check", "machine_binding", "device_ref", "feature_permissions", "exception_type", "message", "script_stack", "user_description", "diagnostic_report", "submitted_by_user"]);
   const output: Record<string, string> = {};
   if (!input || typeof input !== "object" || Array.isArray(input)) return output;
   for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
