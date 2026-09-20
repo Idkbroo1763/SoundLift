@@ -26,6 +26,7 @@
 | Tiltás / visszavonás | korábbi és új állapot, valamint az admin által megadott indok |
 | Offline türelmi idő | `server_check=offline`, licenctípus, verzió és a helyben tárolt funkciójogosultságok |
 | Egyedi funkció | funkciókulcs és `engedélyezve` / `letiltva` állapot |
+| Gépcsere-kérelem | licencreferencia, rövidített gépreferencia és `pending` állapot |
 
 A napló nem tartalmaz nyers licenckulcsot vagy teljes gépazonosítót.
 
@@ -132,6 +133,11 @@ Az admin kulcs csak a saját gépeden legyen. Vásárlói buildbe soha ne kerül
 
 A `Status` értéke `active`, `suspended` vagy `revoked` lehet. Minden módosítás
 külön, megbízható admineseményként kerül a licencnaplóba.
+
+Az alkalmazás **Licenc kezelése → Gépcsere kérelmezése** gombja a
+`soundlift_device_change_requests` táblában hoz létre függő kérelmet. Ez nem
+választja le rögtön a működő gépet. Ellenőrzés után az admin a fenti
+`detach_device` művelettel hagyhatja jóvá az átkötést.
 
 ## Ellenőrzés kiadás előtt
 

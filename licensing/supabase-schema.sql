@@ -45,6 +45,18 @@ create table if not exists public.license_events (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.soundlift_device_change_requests (
+  id uuid primary key default gen_random_uuid(),
+  license_id uuid not null references public.licenses(id) on delete cascade,
+  installation_id uuid not null,
+  current_device_ref text not null check (length(current_device_ref) between 1 and 16),
+  status text not null default 'pending' check (status in ('pending','approved','rejected','completed')),
+  requested_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+create unique index if not exists soundlift_device_change_one_pending_idx
+  on public.soundlift_device_change_requests(license_id) where status = 'pending';
+
 create table if not exists public.app_log_events (
   id bigint generated always as identity primary key,
   event_id uuid not null unique,
@@ -99,11 +111,13 @@ create index if not exists app_log_events_category_received_idx
 alter table public.license_products enable row level security;
 alter table public.licenses enable row level security;
 alter table public.license_events enable row level security;
+alter table public.soundlift_device_change_requests enable row level security;
 alter table public.app_log_events enable row level security;
 alter table public.soundlift_installation_links enable row level security;
 alter table public.soundlift_link_sessions enable row level security;
 
 revoke all on public.license_products, public.licenses, public.license_events, public.app_log_events from anon, authenticated;
+revoke all on public.soundlift_device_change_requests from anon, authenticated;
 revoke all on public.soundlift_installation_links, public.soundlift_link_sessions from anon, authenticated;
 
 create or replace function public.activate_soundlift_license(p_key_hash text, p_product_code text, p_device_id text)
@@ -197,6 +211,7 @@ begin
     'allowed',true,'code','OK','message','A licenc érvényes.',
     'license_type',target.license_type,'is_owner',target.is_owner,
     'license_status',target.status,'customer_name',target.customer_name,'transfer_count',target.transfer_count,
+    'activated_at',coalesce(target.activated_at,now()),'device_ref',left(coalesce(p_device_id,''),12),
     'internal_license_id',target.id,'activation_event',activation_kind
   );
 end;
