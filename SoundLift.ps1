@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '1.6.6'
+$script:appVersion = '1.6.7'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -90,8 +90,7 @@ function Get-SoundLiftThemePalette([string]$themeName = $script:themeName) {
         'Purple Neon'       { @{ Accent='#C084FC'; AccentDark='#7C3AED'; Page='#1A0928'; Hover='#32154A'; Base='#07040B'; Surface='#130B1C'; SurfaceAlt='#0D0714'; Control='#21122F'; Border='#4C2868' } }
         'Cyberpunk'         { @{ Accent='#22D3EE'; AccentDark='#A855F7'; Page='#10142C'; Hover='#212650'; Base='#050611'; Surface='#101126'; SurfaceAlt='#090A19'; Control='#181A35'; Border='#3B3F72' } }
         'Emerald'           { @{ Accent='#34D399'; AccentDark='#059669'; Page='#06251A'; Hover='#123C2C'; Base='#030A08'; Surface='#091A14'; SurfaceAlt='#06120E'; Control='#102A20'; Border='#235A43' } }
-        'Arctic'            { @{ Accent='#2563EB'; AccentDark='#1D4ED8'; Page='#DCEAF7'; Hover='#D6E5F5'; Base='#F4F8FC'; Surface='#FFFFFF'; SurfaceAlt='#EAF2F9'; Control='#E1ECF6'; Border='#A8BED3'; Primary='#172033'; Secondary='#334155'; Muted='#64748B'; Section='#475569'; Contrast='#FFFFFF'; IsLight=$true } }
-        'R6 Siege'          { @{ Accent='#FACC15'; AccentDark='#CA8A04'; Page='#1C1C16'; Hover='#343326'; Base='#080909'; Surface='#151616'; SurfaceAlt='#0E0F0F'; Control='#242525'; Border='#4B4B3A'; Contrast='#111318' } }
+        'Carbon Gold'       { @{ Accent='#FACC15'; AccentDark='#CA8A04'; Page='#1C1C16'; Hover='#343326'; Base='#080909'; Surface='#151616'; SurfaceAlt='#0E0F0F'; Control='#242525'; Border='#4B4B3A'; Contrast='#111318' } }
         'Egyéni téma'       { $customText=Get-SoundLiftContrastColor $script:customTheme.Background; @{ Accent=$script:customTheme.Main; AccentDark=$script:customTheme.Accent; Page=$script:customTheme.Background; Hover=$script:customTheme.Background; Base=$script:customTheme.Background; Surface=$script:customTheme.Background; SurfaceAlt=$script:customTheme.Background; Control=$script:customTheme.Background; Border=$script:customTheme.Accent; Primary=$customText; Secondary=$customText; Muted=$customText; Section=$customText; Contrast=(Get-SoundLiftContrastColor $script:customTheme.Main); IsLight=($customText -eq '#111318') } }
         default             { @{ Accent='#FF4D67'; AccentDark='#A60024'; Page='#220A10'; Hover='#40131C' } }
     }
@@ -116,7 +115,7 @@ function Get-SoundLiftSavedThemeName {
                 foreach ($key in @('Main','Background','Accent')) { if ([string]$saved.customTheme.$key -match '^#[0-9A-Fa-f]{6}$') { $script:customTheme[$key] = [string]$saved.customTheme.$key } }
             }
             $name = [string]$saved.theme
-            $normalized = switch ($name) { 'Black & Red' {'Fekete és piros'} 'Black & Blue' {'Fekete és kék'} 'Graphite & Green' {'Grafit és zöld'} 'Világos' {'Fekete és piros'} default { if($name){$name}else{'Fekete és piros'} } }
+            $normalized = switch ($name) { 'Black & Red' {'Fekete és piros'} 'Black & Blue' {'Fekete és kék'} 'Graphite & Green' {'Grafit és zöld'} 'Világos' {'Fekete és piros'} 'R6 Siege' {'Carbon Gold'} 'Arctic' {'Fekete és kék'} default { if($name){$name}else{'Fekete és piros'} } }
             return $normalized
         }
     } catch { }
@@ -823,7 +822,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V1.6.6" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
+        Title="SoundLift V1.6.7" Width="1220" Height="880" MinWidth="1040" MinHeight="740"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -993,7 +992,7 @@ $xaml = @'
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}"/>
-        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.6.6" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
+        <TextBlock Text="WINDOWS HANGVEZÉRLŐ  •  V1.6.7" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,3,0,0"/>
       </StackPanel>
       <Border Name="StatusBorder" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="15" Padding="17,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
         <StackPanel>
@@ -1081,7 +1080,7 @@ $xaml = @'
               </ComboBox.Resources>
             </ComboBox>
             <Button Name="CustomThemeButton" Content="✎   Egyéni téma szerkesztése" Style="{StaticResource UtilityButton}" Margin="0,0,0,9" Visibility="Collapsed"/>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 1.6.6" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
+            <TextBlock Name="VersionText" Text="Telepített verzió: 1.6.7" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
             <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,4"/>
             <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
             <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,5,0,4"/>
@@ -1272,7 +1271,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V1.6.6'
+$script:trayIcon.Text = 'SoundLift V1.6.7'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','CustomThemeButton','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -1387,7 +1386,7 @@ $script:themeNames = @(
     'Fekete és piros', 'Fekete és kék', 'Grafit és zöld',
     'Fekete és lila', 'Éjkék és türkiz', 'Grafit és narancs',
     'Fekete és arany', 'OLED fekete', 'Midnight Blue', 'Purple Neon',
-    'Cyberpunk', 'Emerald', 'Arctic', 'R6 Siege', 'Egyéni téma'
+    'Cyberpunk', 'Emerald', 'Carbon Gold', 'Egyéni téma'
 )
 foreach ($themeOptionName in $script:themeNames) { [void]$ThemeCombo.Items.Add($themeOptionName) }
 if ($script:themeNames -notcontains $script:themeName) { $script:themeName = 'Fekete és piros' }
@@ -1711,7 +1710,7 @@ function Set-AppState($state) {
         }
     }
     if ($state.theme) {
-        $savedTheme = switch ([string]$state.theme) { 'Black & Red' {'Fekete és piros'} 'Black & Blue' {'Fekete és kék'} 'Graphite & Green' {'Grafit és zöld'} 'Világos' {'Fekete és piros'} default {[string]$state.theme} }
+        $savedTheme = switch ([string]$state.theme) { 'Black & Red' {'Fekete és piros'} 'Black & Blue' {'Fekete és kék'} 'Graphite & Green' {'Grafit és zöld'} 'Világos' {'Fekete és piros'} 'R6 Siege' {'Carbon Gold'} 'Arctic' {'Fekete és kék'} default {[string]$state.theme} }
         if ($script:themeNames -contains $savedTheme) { $ThemeCombo.SelectedItem = $savedTheme; Set-AppTheme $savedTheme }
     }
     if ($null -ne $state.onboardingCompleted) { $script:onboardingCompleted = [bool]$state.onboardingCompleted }
@@ -2473,6 +2472,11 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V1.6.7 – TÉMALISTA PONTOSÍTÁSA
+• Az Arctic téma kikerült a SoundLiftből.
+• Az R6 Siege téma új neve Carbon Gold, amely pontosabban leírja a sötét, arany kiemelésű megjelenést.
+• A korábban R6 Siege témát használó beállítások automatikusan Carbon Goldra frissülnek.
+
 V1.6.6 – INDÍTÁSI GYORSJAVÍTÁS
 • Javítva az új témák feldolgozása közben fellépő FormatException, amely miatt a v1.6.5 az engedélykérés után bezárult.
 • A témalista már nem írja felül induláskor a mentett témát.
