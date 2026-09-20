@@ -84,7 +84,7 @@ export async function storeAndForwardEvent(supabase: any, event: BackendLogEvent
   const webhook = Deno.env.get(webhookNames[event.category]) ?? Deno.env.get("DISCORD_LOG_WEBHOOK_DEFAULT");
   if (!webhook) return false;
 
-  const fields = Object.entries(event.metadata ?? {}).slice(0, 8).map(([name, value]) => ({
+  const fields = Object.entries(event.metadata ?? {}).slice(0, 16).map(([name, value]) => ({
     name: clipped(name, 80), value: clipped(value), inline: true,
   }));
   try {
