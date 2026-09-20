@@ -29,8 +29,8 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '2.0.0'")) { throw 'Application version was not updated to 2.0.0' }
-foreach ($requiredV2DashboardFragment in @('SoundLift V2.0.0', 'GYORS PROFILOK', 'QuickProfileButton', 'DashboardCard', "`$activeButton.Background = `$window.Resources['AccentGradient']")) {
+if (-not $source.Contains("`$script:appVersion = '2.0.1'")) { throw 'Application version was not updated to 2.0.1' }
+foreach ($requiredV2DashboardFragment in @('SoundLift V2.0.1', 'GYORS PROFILOK', 'QuickProfileButton', 'DashboardCard', 'SOUNDLIFT PRO', 'ProfileManagerButton', "`$activeButton.Background = `$window.Resources['AccentGradient']")) {
  if (-not $source.Contains($requiredV2DashboardFragment)) { throw "Missing V2.0 dashboard behavior: $requiredV2DashboardFragment" }
 }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
@@ -151,13 +151,14 @@ foreach ($requiredCleanupBehavior in @('Remove-SoundLiftInclude', "Join-Path `$e
     if (-not $uninstallerSource.Contains($requiredCleanupBehavior)) { throw "Missing clean uninstall behavior: $requiredCleanupBehavior" }
 }
 if (-not $source.Contains("`$script:discordLinkGraceHours = 720")) { throw 'Offline grace period is not 30 days' }
-foreach ($requiredThemeMarker in @('#C084FC','#22D3EE','#FB923C','#FACC55','OLED fekete','Midnight Blue','Purple Neon','Cyberpunk','Emerald','Carbon Gold','CustomThemeButton','Show-SoundLiftCustomThemeEditor','Get-SoundLiftContrastColor')) {
+foreach ($requiredThemeMarker in @('#C084FC','#22D3EE','#FB923C','#FACC55','OLED fekete','Midnight Blue','Purple Neon','Cyberpunk','Emerald','Carbon Gold')) {
     if (-not $source.Contains($requiredThemeMarker)) { throw "Missing SoundLift theme marker: $requiredThemeMarker" }
 }
 foreach ($requiredThemeStartupFix in @("if (`$entry.Key -eq 'IsLight') { continue }", 'foreach ($themeOptionName in $script:themeNames)', 'try { Set-AppTheme $script:themeName } catch')) {
     if (-not $source.Contains($requiredThemeStartupFix)) { throw "Missing V1.6.6 theme startup fix: $requiredThemeStartupFix" }
 }
 if ($source.Contains("'Cyberpunk', 'Emerald', 'Arctic', 'R6 Siege'")) { throw 'Removed Arctic and R6 Siege theme names are still present in the selectable theme list' }
+if ($source.Contains('CustomThemeButton') -or $source.Contains('Show-SoundLiftCustomThemeEditor') -or $source.Contains('$script:customTheme')) { throw 'The removed custom theme implementation is still present' }
 foreach ($requiredUiFix in @(
     '<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden"',
     'function Test-SoundLiftProblemReportService',
@@ -222,7 +223,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='2.0.0'
+ $script:appVersion='2.0.1'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }
