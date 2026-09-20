@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '2.0.0'
+$script:appVersion = '2.0.1'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -67,15 +67,6 @@ $script:discordLinkGraceHours = 720
 $script:loggerInitialized = $false
 $script:startupCompleted = $false
 $script:themeName = 'Fekete és piros'
-$script:customTheme = @{ Main='#8B5CF6'; Background='#070B14'; Accent='#22D3EE' }
-
-function Get-SoundLiftContrastColor([string]$color) {
-    try {
-        $value = $color.TrimStart('#')
-        $r = [Convert]::ToInt32($value.Substring(0,2),16); $g = [Convert]::ToInt32($value.Substring(2,2),16); $b = [Convert]::ToInt32($value.Substring(4,2),16)
-        return $(if ((0.299*$r + 0.587*$g + 0.114*$b) -gt 155) { '#111318' } else { '#FFFFFF' })
-    } catch { return '#FFFFFF' }
-}
 
 function Get-SoundLiftThemePalette([string]$themeName = $script:themeName) {
     $theme = switch ($themeName) {
@@ -91,7 +82,6 @@ function Get-SoundLiftThemePalette([string]$themeName = $script:themeName) {
         'Cyberpunk'         { @{ Accent='#22D3EE'; AccentDark='#A855F7'; Page='#10142C'; Hover='#212650'; Base='#050611'; Surface='#101126'; SurfaceAlt='#090A19'; Control='#181A35'; Border='#3B3F72' } }
         'Emerald'           { @{ Accent='#34D399'; AccentDark='#059669'; Page='#06251A'; Hover='#123C2C'; Base='#030A08'; Surface='#091A14'; SurfaceAlt='#06120E'; Control='#102A20'; Border='#235A43' } }
         'Carbon Gold'       { @{ Accent='#FACC15'; AccentDark='#CA8A04'; Page='#1C1C16'; Hover='#343326'; Base='#080909'; Surface='#151616'; SurfaceAlt='#0E0F0F'; Control='#242525'; Border='#4B4B3A'; Contrast='#111318' } }
-        'Egyéni téma'       { $customText=Get-SoundLiftContrastColor $script:customTheme.Background; @{ Accent=$script:customTheme.Main; AccentDark=$script:customTheme.Accent; Page=$script:customTheme.Background; Hover=$script:customTheme.Background; Base=$script:customTheme.Background; Surface=$script:customTheme.Background; SurfaceAlt=$script:customTheme.Background; Control=$script:customTheme.Background; Border=$script:customTheme.Accent; Primary=$customText; Secondary=$customText; Muted=$customText; Section=$customText; Contrast=(Get-SoundLiftContrastColor $script:customTheme.Main); IsLight=($customText -eq '#111318') } }
         default             { @{ Accent='#FF4D67'; AccentDark='#A60024'; Page='#220A10'; Hover='#40131C' } }
     }
     return @{
@@ -111,11 +101,8 @@ function Get-SoundLiftSavedThemeName {
         $earlySettingsPath = Join-Path $env:APPDATA 'SoundLift\settings.json'
         if (Test-Path -LiteralPath $earlySettingsPath) {
             $saved = Get-Content -LiteralPath $earlySettingsPath -Raw | ConvertFrom-Json
-            if ($saved.customTheme) {
-                foreach ($key in @('Main','Background','Accent')) { if ([string]$saved.customTheme.$key -match '^#[0-9A-Fa-f]{6}$') { $script:customTheme[$key] = [string]$saved.customTheme.$key } }
-            }
             $name = [string]$saved.theme
-            $normalized = switch ($name) { 'Black & Red' {'Fekete és piros'} 'Black & Blue' {'Fekete és kék'} 'Graphite & Green' {'Grafit és zöld'} 'Világos' {'Fekete és piros'} 'R6 Siege' {'Carbon Gold'} 'Arctic' {'Fekete és kék'} default { if($name){$name}else{'Fekete és piros'} } }
+            $normalized = switch ($name) { 'Black & Red' {'Fekete és piros'} 'Black & Blue' {'Fekete és kék'} 'Graphite & Green' {'Grafit és zöld'} 'Világos' {'Fekete és piros'} 'R6 Siege' {'Carbon Gold'} 'Arctic' {'Fekete és kék'} 'Egyéni téma' {'Fekete és piros'} default { if($name){$name}else{'Fekete és piros'} } }
             return $normalized
         }
     } catch { }
@@ -822,7 +809,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V2.0.0" Width="1320" Height="900" MinWidth="1100" MinHeight="760"
+        Title="SoundLift V2.0.1" Width="1320" Height="900" MinWidth="1100" MinHeight="760"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -994,267 +981,191 @@ $xaml = @'
   </Window.Resources>
 
   <Grid Background="{DynamicResource PageGradient}">
-    <Grid.RowDefinitions><RowDefinition Height="118"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <Grid.ColumnDefinitions><ColumnDefinition Width="196"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
 
-    <Grid Grid.Row="0" Margin="30,20,30,14">
-      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
-      <StackPanel VerticalAlignment="Center">
-        <TextBlock Text="JOBB HANGZÁS." FontFamily="Segoe UI Black" FontSize="17" Foreground="{DynamicResource PrimaryTextBrush}"/>
-        <TextBlock Text="NAGYOBB ÉLMÉNY." FontFamily="Segoe UI Black" FontSize="29" Foreground="{DynamicResource AccentTextBrush}" Margin="0,-2,0,0"/>
-        <TextBlock Text="SOUNDLIFT 2  •  A hangod, a szabályaid." FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="1,4,0,0"/>
-      </StackPanel>
-      <Border Name="StatusBorder" Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="15" Padding="17,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
-        <StackPanel>
-          <TextBlock Name="StatusText" Text="A hangrendszer ellenőrzése folyamatban…" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/>
-          <TextBlock Name="DeviceText" Text="Aktív hangkimenet észlelése…" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+    <Border Grid.Column="0" Margin="14" Background="#E90B0B0D" CornerRadius="16" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
+      <Grid Margin="13">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <StackPanel Margin="5,9,5,24">
+          <TextBlock Text="✦  SOUNDLIFT" FontFamily="Segoe UI Black" FontSize="18" Foreground="{DynamicResource PrimaryTextBrush}"/>
+          <Border Height="3" Width="49" Background="{DynamicResource AccentTextBrush}" CornerRadius="2" HorizontalAlignment="Left" Margin="22,6,0,0"/>
         </StackPanel>
-      </Border>
-    </Grid>
 
-    <Grid Grid.Row="1" Margin="30,0,30,28">
-      <Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <StackPanel Grid.Row="1">
+          <TextBlock Text="FŐMENÜ" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="10,0,0,8"/>
+          <Button Content="⌂   Főoldal" Background="{DynamicResource AccentGradient}" BorderBrush="{DynamicResource AccentTextBrush}" BorderThickness="1"/>
+          <Button Name="DeviceButton" Content="♫   Hangeszközök" Style="{StaticResource QuickProfileButton}"/>
+          <Button Name="HotkeyButton" Content="⌨   Billentyűparancsok" Style="{StaticResource QuickProfileButton}"/>
+          <Button Name="DiagnosticsButton" Content="◉   Diagnosztika" Style="{StaticResource QuickProfileButton}"/>
+          <Button Name="LicenseButton" Content="◇   Licenc" Style="{StaticResource QuickProfileButton}"/>
+          <Button Name="AboutButton" Content="ⓘ   A SoundLiftről" Style="{StaticResource QuickProfileButton}"/>
+          <Button Name="PrivacyButton" Content="◈   Adatvédelem" Style="{StaticResource QuickProfileButton}"/>
+          <Button Name="ChangelogButton" Content="≡   Újdonságok" Style="{StaticResource QuickProfileButton}"/>
+        </StackPanel>
 
-      <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}" CornerRadius="18" Padding="16" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
-        <Grid>
-          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-          <StackPanel>
-            <TextBlock Text="GYORS PROFILOK" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}" Margin="5,2,0,4"/>
-            <TextBlock Text="Mindig kéznél, egy kattintásra" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" Margin="5,0,0,13"/>
-          </StackPanel>
-          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Margin="0,0,0,4">
-          <StackPanel Name="ProfilePanel">
-            <Button Name="MusicButton" Content="♫   Zene" Style="{StaticResource QuickProfileButton}"/>
-            <Button Name="GameButton" Content="◆   FiveM RP" Style="{StaticResource QuickProfileButton}"/>
-            <Button Name="CombatButton" Content="⌁   FiveM PvP" Style="{StaticResource QuickProfileButton}"/>
-            <Button Name="R6Button" Content="◎   Rainbow Six Siege" Style="{StaticResource QuickProfileButton}"/>
-            <Button Name="DiscordButton" Content="◉   Discord" Style="{StaticResource QuickProfileButton}"/>
-            <Button Name="MovieButton" Content="▶   Film" Style="{StaticResource QuickProfileButton}"/>
-            <Button Name="HeavyButton" Content="ϟ   Erőteljes basszus" Style="{StaticResource QuickProfileButton}"/>
-            <Button Name="ResetButton" Content="↺   Alapbeállítások" Style="{StaticResource QuickProfileButton}"/>
-            <TextBlock Name="CustomFeaturesTitle" Text="EGYEDI FUNKCIÓK" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}" Margin="4,12,0,5" Visibility="Collapsed"/>
-            <Button Name="ExtraBassProButton" Content="✦   Extra mélyhang Pro" Style="{StaticResource QuickProfileButton}" Visibility="Collapsed"/>
-            <Button Name="VoiceBoostButton" Content="◈   Beszédkiemelés" Style="{StaticResource QuickProfileButton}" Visibility="Collapsed"/>
-            <Button Name="CustomPresetXButton" Content="◆   Egyéni profil X" Style="{StaticResource QuickProfileButton}" Visibility="Collapsed"/>
-            <Button Name="ProfileOrderButton" Content="☰   Profilok rendezése" Style="{StaticResource UtilityButton}" Margin="0,10,0,4"/>
-          </StackPanel>
-          </ScrollViewer>
-          <StackPanel Grid.Row="2">
-            <Border Height="1" Background="#303035" Margin="0,4,0,13"/>
-            <TextBlock Text="MEGJELENÉS" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}" Margin="4,0,0,5"/>
-            <ComboBox Name="ThemeCombo" Height="34" Margin="0,0,0,9" Padding="8,3"
-                      Background="{DynamicResource ControlBrush}" Foreground="{DynamicResource PrimaryTextBrush}" BorderBrush="{DynamicResource BorderBrush}" FontWeight="SemiBold">
-              <ComboBox.Template>
-                <ControlTemplate TargetType="{x:Type ComboBox}">
-                  <Grid>
-                    <ToggleButton Focusable="False" ClickMode="Press"
-                                  IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
-                      <ToggleButton.Template>
-                        <ControlTemplate TargetType="{x:Type ToggleButton}">
-                          <Border x:Name="ThemeBorder" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource BorderBrush}"
-                                  BorderThickness="1" CornerRadius="5">
-                            <Grid>
-                              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
-                              <Path Grid.Column="1" Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                    Fill="#CBD5E1" Data="M 0 0 L 4 4 L 8 0 Z"/>
-                            </Grid>
-                          </Border>
-                          <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ThemeBorder" Property="BorderBrush" Value="{DynamicResource AccentTextBrush}"/></Trigger>
-                          </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                      </ToggleButton.Template>
-                    </ToggleButton>
-                    <TextBlock Margin="11,0,34,0" VerticalAlignment="Center" HorizontalAlignment="Left"
-                               IsHitTestVisible="False" Text="{TemplateBinding SelectionBoxItem}"
-                               Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis"/>
-                    <Popup Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}"
-                           AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
-                      <Border Margin="0,3,0,0" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="180"
-                              Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="5">
-                        <ScrollViewer Margin="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                          <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
-                        </ScrollViewer>
-                      </Border>
-                    </Popup>
-                  </Grid>
-                </ControlTemplate>
-              </ComboBox.Template>
-              <ComboBox.Resources>
-                <Style TargetType="{x:Type ComboBoxItem}">
-                  <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
-                  <Setter Property="Background" Value="{DynamicResource ControlBrush}"/>
-                  <Setter Property="Padding" Value="9,6"/>
-                  <Style.Triggers>
-                    <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource HoverBrush}"/></Trigger>
-                    <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{DynamicResource AccentTextBrush}"/><Setter Property="Foreground" Value="{DynamicResource AccentContrastBrush}"/></Trigger>
-                  </Style.Triggers>
-                </Style>
-              </ComboBox.Resources>
-            </ComboBox>
-            <Button Name="CustomThemeButton" Content="✎   Egyéni téma szerkesztése" Style="{StaticResource UtilityButton}" Margin="0,0,0,9" Visibility="Collapsed"/>
-            <TextBlock Name="VersionText" Text="Telepített verzió: 2.0.0" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,6"/>
-            <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,0,0,4"/>
-            <Button Name="CopySupportIdButton" Content="⧉  Támogatási ID másolása" Style="{StaticResource UtilityButton}"/>
-            <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="4,5,0,4"/>
-            <Button Name="LicenseButton" Content="◇  Licenc kezelése" Style="{StaticResource UtilityButton}"/>
-            <TextBlock Name="ActiveProfileText" Text="Aktív profil: Egyéni" Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold" FontSize="12" Margin="4,0,0,10"/>
-            <Button Name="AboutButton" Content="ⓘ  A SoundLiftről és Discord" Style="{StaticResource UtilityButton}"/>
-            <Button Name="PrivacyButton" Content="◈  Adatvédelem" Style="{StaticResource UtilityButton}"/>
-            <Button Name="ApplyButton" Content="BEÁLLÍTÁSOK ALKALMAZÁSA" Style="{StaticResource PrimaryButton}" FontSize="13" Padding="10,13"/>
-          </StackPanel>
-        </Grid>
-      </Border>
-
-      <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
-        <StackPanel>
-          <Border Style="{StaticResource DashboardCard}" Margin="0,0,0,14">
-            <Grid>
-              <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-              <Grid Width="172" Height="172" VerticalAlignment="Center">
-                <Ellipse Stroke="{DynamicResource BorderBrush}" StrokeThickness="12" Fill="{DynamicResource SurfaceAltBrush}"/>
-                <Ellipse Stroke="{DynamicResource AccentTextBrush}" StrokeThickness="7" Margin="10" Opacity="0.9"/>
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                  <TextBlock Name="VolumeValue" Text="100%" FontFamily="Segoe UI Black" FontSize="35" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center"/>
-                  <TextBlock Text="HANGERŐ" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
-                </StackPanel>
-              </Grid>
-              <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                <TextBlock Text="FŐ HANGVEZÉRLÉS" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}" Margin="0,0,0,5"/>
-                <TextBlock Text="Hangerő erősítése" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/>
-                <Slider Name="VolumeSlider" Minimum="0" Maximum="300" Value="100" TickFrequency="5" IsSnapToTickEnabled="True"/>
-                <TextBlock Text="0% = némítás  •  100% = eredeti hangerő  •  maximum 300%" FontSize="11" Foreground="{DynamicResource MutedTextBrush}"/>
-                <DockPanel Margin="0,12,0,0"><TextBlock Text="Mélyhangkiemelés" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/><TextBlock Name="BassValue" Text="6 dB" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Right"/></DockPanel>
-                <Slider Name="BassSlider" Minimum="0" Maximum="24" Value="6" TickFrequency="1" IsSnapToTickEnabled="True"/>
-                <TextBlock Text="A basszus ereje 0 és 24 dB között" FontSize="11" Foreground="{DynamicResource MutedTextBrush}"/>
-              </StackPanel>
-            </Grid>
-          </Border>
-
-          <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="18" Padding="22,17" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}" Margin="0,0,0,14">
-            <Grid>
-              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-              <DockPanel>
-                <TextBlock Text="Basszus karaktere" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/>
-                <TextBlock Name="FrequencyValue" Text="75 Hz" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Right"/>
-              </DockPanel>
-              <Slider Name="FrequencySlider" Grid.Row="1" Minimum="40" Maximum="160" Value="75" TickFrequency="5" IsSnapToTickEnabled="True"/>
-            </Grid>
-          </Border>
-
-          <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="18" Padding="22,15" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}" Margin="0,0,0,14">
-            <Grid>
-              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-              <DockPanel Margin="0,0,0,10">
-                <TextBlock Text="ÉLŐ HANGMÉRŐ" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                  <TextBlock Name="LiveBoostText" Text="Erősítés: 0,0 dB" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="0,0,14,0"/>
-                  <TextBlock Name="LiveClipText" Text="NINCS JEL" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" FontWeight="Bold"/>
-                </StackPanel>
-              </DockPanel>
-              <Grid Grid.Row="1" Margin="0,0,0,7">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/><ColumnDefinition Width="48"/></Grid.ColumnDefinitions>
-                <TextBlock Text="B" ToolTip="Bal csatorna" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
-                <ProgressBar Name="LeftPeakMeter" Grid.Column="1" Height="9" Minimum="0" Maximum="100" Value="0" Foreground="{DynamicResource AccentTextBrush}" Background="{DynamicResource ControlBrush}" BorderThickness="0"/>
-                <TextBlock Name="LeftPeakText" Grid.Column="2" Text="0%" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11"/>
-              </Grid>
-              <Grid Grid.Row="2">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/><ColumnDefinition Width="48"/></Grid.ColumnDefinitions>
-                <TextBlock Text="J" ToolTip="Jobb csatorna" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
-                <ProgressBar Name="RightPeakMeter" Grid.Column="1" Height="9" Minimum="0" Maximum="100" Value="0" Foreground="{DynamicResource AccentTextBrush}" Background="{DynamicResource ControlBrush}" BorderThickness="0"/>
-                <TextBlock Name="RightPeakText" Grid.Column="2" Text="0%" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11"/>
-              </Grid>
-            </Grid>
-          </Border>
-
-          <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="18" Padding="22,15" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}" Margin="0,0,0,14">
-            <Grid>
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock Text="VÉDELEM ÉS AUTOMATIZÁLÁS" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}" Margin="0,0,0,8"/>
-                <WrapPanel>
-                  <CheckBox Name="SafetyCheck" Content="Torzításvédelem" IsChecked="True"/>
-                  <CheckBox Name="AutoProfileCheck" Visibility="Collapsed" IsChecked="False"/>
-                  <CheckBox Name="InstantCheck" Content="Módosítások azonnali alkalmazása"/>
-                  <CheckBox Name="StartupCheck" Content="Automatikus indítás a Windowssal"/>
-                  <CheckBox Name="DoNotDisturbCheck" Content="Ne zavarjanak mód" ToolTip="Játék közben elrejti a nem fontos felugró értesítéseket."/>
-                  <CheckBox Name="NightModeCheck" Visibility="Collapsed" IsChecked="False"/>
-                  <CheckBox Name="OverlayCheck" Visibility="Collapsed" IsChecked="False"/>
-                  <CheckBox Name="DiscordPresenceCheck" Visibility="Collapsed" IsChecked="False"/>
-                </WrapPanel>
-              </StackPanel>
-              <Border Grid.Column="1" Background="#12291F" CornerRadius="9" Padding="12,7" VerticalAlignment="Center">
-                <TextBlock Name="ClipText" Text="VÉDVE" Foreground="#4ADE80" FontWeight="Bold" FontSize="11"/>
-              </Border>
-            </Grid>
-          </Border>
-
-          <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="18" Padding="22,15" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}" Margin="0,0,0,14">
+        <StackPanel Grid.Row="2">
+          <TextBlock Text="TÉMA" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" Margin="7,0,0,6"/>
+          <ComboBox Name="ThemeCombo" Height="34" Margin="0,0,0,8" Padding="8,3" Background="{DynamicResource ControlBrush}" Foreground="{DynamicResource PrimaryTextBrush}" BorderBrush="{DynamicResource BorderBrush}" FontWeight="SemiBold">
+            <ComboBox.Resources>
+              <Style TargetType="{x:Type ComboBoxItem}"><Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/><Setter Property="Background" Value="{DynamicResource ControlBrush}"/><Setter Property="Padding" Value="8,5"/></Style>
+            </ComboBox.Resources>
+          </ComboBox>
+          <Border Background="#241014" BorderBrush="#5A2029" BorderThickness="1" CornerRadius="11" Padding="11,9" Margin="0,3,0,9">
             <StackPanel>
-              <DockPanel Margin="0,0,0,10">
-                <TextBlock Text="10 SÁVOS HANGSZÍNSZABÁLYZÓ" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}"/>
-                <TextBlock Text="-12 dB  •  +12 dB" HorizontalAlignment="Right" Foreground="{DynamicResource MutedTextBrush}" FontSize="11"/>
+              <TextBlock Text="SOUNDLIFT PRO" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}"/>
+              <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,3,0,0"/>
+            </StackPanel>
+          </Border>
+          <TextBlock Name="VersionText" Text="Telepített verzió: 2.0.1" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="4,0,0,3"/>
+          <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" FontSize="9" Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis" Margin="4,0,0,4"/>
+          <Button Name="CopySupportIdButton" Content="⧉  ID másolása" Style="{StaticResource UtilityButton}" Margin="0"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Column="1" Margin="4,14,14,14">
+      <Grid.RowDefinitions><RowDefinition Height="76"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+
+      <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="430"/></Grid.ColumnDefinitions>
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="JOBB HANGZÁS." FontFamily="Segoe UI Black" FontSize="16" Foreground="{DynamicResource PrimaryTextBrush}"/>
+          <TextBlock Text="NAGYOBB ÉLMÉNY." FontFamily="Segoe UI Black" FontSize="27" Foreground="{DynamicResource AccentTextBrush}" Margin="0,-3,0,0"/>
+          <TextBlock Text="A hangerőn túl – teljesen személyre szabható hangzás." FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="1,2,0,0"/>
+        </StackPanel>
+        <Border Name="StatusBorder" Grid.Column="1" Background="#D9111113" CornerRadius="12" Padding="14,10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+          <StackPanel>
+            <TextBlock Name="StatusText" Text="A hangrendszer ellenőrzése folyamatban…" FontSize="12" FontWeight="SemiBold"/>
+            <TextBlock Name="DeviceText" Text="Aktív hangkimenet észlelése…" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+        <StackPanel>
+          <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="252"/></Grid.ColumnDefinitions>
+
+            <Border Style="{StaticResource DashboardCard}">
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="205"/><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Grid Width="184" Height="184" VerticalAlignment="Center">
+                  <Ellipse Stroke="#38181D" StrokeThickness="16" Fill="{DynamicResource SurfaceAltBrush}"/>
+                  <Ellipse Stroke="{DynamicResource AccentTextBrush}" StrokeThickness="7" Margin="12"/>
+                  <Ellipse Stroke="{DynamicResource BorderBrush}" StrokeThickness="1" Margin="28"/>
+                  <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Name="VolumeValue" Text="100%" FontFamily="Segoe UI Black" FontSize="37" HorizontalAlignment="Center"/>
+                    <TextBlock Text="HANGERŐ" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                  </StackPanel>
+                </Grid>
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                  <DockPanel><TextBlock Text="Hangerő-erősítés" FontSize="14" FontWeight="Bold"/><TextBlock Text="max. 300%" HorizontalAlignment="Right" FontSize="10" Foreground="{DynamicResource MutedTextBrush}"/></DockPanel>
+                  <Slider Name="VolumeSlider" Minimum="0" Maximum="300" Value="100" TickFrequency="5" IsSnapToTickEnabled="True"/>
+                  <DockPanel Margin="0,10,0,0"><TextBlock Text="Mélyhangkiemelés" FontSize="14" FontWeight="Bold"/><TextBlock Name="BassValue" Text="6 dB" HorizontalAlignment="Right" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}"/></DockPanel>
+                  <Slider Name="BassSlider" Minimum="0" Maximum="24" Value="6" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                  <DockPanel Margin="0,10,0,0"><TextBlock Text="Basszus karaktere" FontSize="14" FontWeight="Bold"/><TextBlock Name="FrequencyValue" Text="75 Hz" HorizontalAlignment="Right" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentTextBrush}"/></DockPanel>
+                  <Slider Name="FrequencySlider" Minimum="40" Maximum="160" Value="75" TickFrequency="5" IsSnapToTickEnabled="True"/>
+                  <WrapPanel Margin="0,8,0,0">
+                    <CheckBox Name="SafetyCheck" Content="Torzításvédelem" IsChecked="True"/>
+                    <CheckBox Name="InstantCheck" Content="Azonnali alkalmazás"/>
+                  </WrapPanel>
+                  <Button Name="ApplyButton" Content="BEÁLLÍTÁSOK ALKALMAZÁSA" Style="{StaticResource PrimaryButton}" Margin="0,8,0,0"/>
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource DashboardCard}" Padding="13">
+              <Grid>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <DockPanel Margin="3,0,3,8">
+                  <TextBlock Text="GYORS PROFILOK" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}"/>
+                  <TextBlock Name="ActiveProfileText" Text="Aktív: Egyéni" HorizontalAlignment="Right" FontSize="10" Foreground="{DynamicResource AccentTextBrush}"/>
+                </DockPanel>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
+                  <StackPanel Name="ProfilePanel">
+                    <Button Name="MusicButton" Content="♫   Zene" Style="{StaticResource QuickProfileButton}"/>
+                    <Button Name="GameButton" Content="◆   FiveM RP" Style="{StaticResource QuickProfileButton}"/>
+                    <Button Name="CombatButton" Content="⌁   FiveM PvP" Style="{StaticResource QuickProfileButton}"/>
+                    <Button Name="R6Button" Content="◎   Rainbow Six Siege" Style="{StaticResource QuickProfileButton}"/>
+                    <Button Name="DiscordButton" Content="◉   Discord" Style="{StaticResource QuickProfileButton}"/>
+                    <Button Name="MovieButton" Content="▶   Film" Style="{StaticResource QuickProfileButton}"/>
+                    <Button Name="HeavyButton" Content="ϟ   Erőteljes basszus" Style="{StaticResource QuickProfileButton}"/>
+                    <Button Name="ResetButton" Content="↺   Alapbeállítások" Style="{StaticResource QuickProfileButton}"/>
+                    <TextBlock Name="CustomFeaturesTitle" Text="EGYEDI FUNKCIÓK" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}" Margin="4,8,0,5" Visibility="Collapsed"/>
+                    <Button Name="ExtraBassProButton" Content="✦   Extra mélyhang Pro" Style="{StaticResource QuickProfileButton}" Visibility="Collapsed"/>
+                    <Button Name="VoiceBoostButton" Content="◈   Beszédkiemelés" Style="{StaticResource QuickProfileButton}" Visibility="Collapsed"/>
+                    <Button Name="CustomPresetXButton" Content="◆   Egyéni profil X" Style="{StaticResource QuickProfileButton}" Visibility="Collapsed"/>
+                    <Button Name="ProfileOrderButton" Content="+   Profilok rendezése" Style="{StaticResource UtilityButton}" Margin="0,3,0,0"/>
+                  </StackPanel>
+                </ScrollViewer>
+                <TextBlock Grid.Row="2" Text="A profilok mindig elérhetők ezen a panelen." FontSize="9" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="3,8,3,0"/>
+              </Grid>
+            </Border>
+          </Grid>
+
+          <Border Style="{StaticResource DashboardCard}" Margin="0,0,0,12" Padding="18,13">
+            <StackPanel>
+              <DockPanel Margin="0,0,0,8">
+                <TextBlock Text="10 SÁVOS HANGSZÍNSZABÁLYZÓ" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                  <TextBlock Name="LiveBoostText" Text="Erősítés: 0,0 dB" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,12,0"/>
+                  <TextBlock Name="LiveClipText" Text="NINCS JEL" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}"/>
+                </StackPanel>
               </DockPanel>
-              <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="12" Padding="12">
-                <UniformGrid Name="EqPanel" Rows="1" Columns="10"/>
-              </Border>
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="145"/></Grid.ColumnDefinitions>
+                <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="11" Padding="9">
+                  <UniformGrid Name="EqPanel" Rows="1" Columns="10"/>
+                </Border>
+                <StackPanel Grid.Column="1" Margin="14,3,0,0">
+                  <TextBlock Text="ÉLŐ HANGMÉRŐ" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}" Margin="0,0,0,9"/>
+                  <TextBlock Text="BAL" FontSize="8" Foreground="{DynamicResource MutedTextBrush}"/>
+                  <ProgressBar Name="LeftPeakMeter" Height="8" Minimum="0" Maximum="100" Value="0" Foreground="{DynamicResource AccentTextBrush}" Background="{DynamicResource ControlBrush}"/>
+                  <TextBlock Name="LeftPeakText" Text="0%" FontSize="9" HorizontalAlignment="Right" Foreground="{DynamicResource SecondaryTextBrush}"/>
+                  <TextBlock Text="JOBB" FontSize="8" Foreground="{DynamicResource MutedTextBrush}" Margin="0,8,0,0"/>
+                  <ProgressBar Name="RightPeakMeter" Height="8" Minimum="0" Maximum="100" Value="0" Foreground="{DynamicResource AccentTextBrush}" Background="{DynamicResource ControlBrush}"/>
+                  <TextBlock Name="RightPeakText" Text="0%" FontSize="9" HorizontalAlignment="Right" Foreground="{DynamicResource SecondaryTextBrush}"/>
+                </StackPanel>
+              </Grid>
             </StackPanel>
           </Border>
 
-          <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="18" Padding="20,17" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Effect="{StaticResource CardShadow}">
+          <Border Style="{StaticResource DashboardCard}" Margin="0,0,0,12" Padding="16,12">
             <Grid>
-              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-              <TextBlock Text="ESZKÖZÖK ÉS KARBANTARTÁS" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SectionTextBrush}" Margin="2,0,0,12"/>
-              <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="1*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="1*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
-                <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="13" Padding="14,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                  <StackPanel>
-                    <TextBlock Text="PROFILOK" Foreground="{DynamicResource SectionTextBrush}" FontSize="10" FontWeight="Bold" Margin="2,0,0,3"/>
-                    <TextBlock Text="Mentés, betöltés és átvitel" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" Margin="2,0,0,10"/>
-                    <Button Name="ProfileManagerButton" Content="☰  Profilkezelés" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
-                    <Button Name="SaveButton" Visibility="Collapsed"/>
-                    <Button Name="LoadButton" Visibility="Collapsed"/>
-                    <Button Name="ExportButton" Visibility="Collapsed"/>
-                    <Button Name="ImportButton" Visibility="Collapsed"/>
-                    <Button Name="UndoButton" Content="↶  Előző beállítás visszaállítása" Style="{StaticResource UtilityButton}" Margin="0"/>
-                  </StackPanel>
-                </Border>
-                <Border Grid.Column="2" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="13" Padding="14,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                  <StackPanel>
-                    <TextBlock Text="HANGRENDSZER" Foreground="{DynamicResource SectionTextBrush}" FontSize="10" FontWeight="Bold" Margin="2,0,0,3"/>
-                    <TextBlock Text="Equalizer APO beállítása és ellenőrzése" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" Margin="2,0,0,10"/>
-                    <Button Name="TestButton" Content="◉  Basszus tesztelése (60 Hz)" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
-                    <Button Name="DeviceButton" Content="▣  Hangeszközök beállítása" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
-                    <Button Name="AppVolumeButton" Content="▥  Alkalmazásonkénti hangerő" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
-                    <Button Name="MicrophoneButton" Content="◉  Mikrofonjavítás" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
-                    <Button Name="DiagnosticsButton" Content="✓  Rendszer ellenőrzése" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
-                    <Button Name="RepairApoButton" Content="⟳  APO-kapcsolat javítása" Style="{StaticResource UtilityButton}" Margin="0"/>
-                  </StackPanel>
-                </Border>
-                <Border Grid.Column="4" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="13" Padding="14,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                  <StackPanel>
-                    <TextBlock Text="TÁMOGATÁS ÉS FRISSÍTÉS" Foreground="{DynamicResource SectionTextBrush}" FontSize="10" FontWeight="Bold" Margin="2,0,0,3"/>
-                    <TextBlock Text="Segítség és alkalmazásverzió" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" Margin="2,0,0,10"/>
-                    <Button Name="ReportProblemButton" Content="⚑  Hibajelentés küldése" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
-                    <Button Name="UpdateButton" Content="↻  Frissítés keresése" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
-                    <Button Name="ChangelogButton" Content="≡  Frissítési előzmények" Style="{StaticResource UtilityButton}" Margin="0,0,0,8"/>
-                    <Button Name="HotkeyButton" Content="⌨  Billentyűparancsok" Style="{StaticResource UtilityButton}" Margin="0,0,0,8" ToolTip="A globális profilváltó és gyors némító billentyűk szerkesztése."/>
-                    <Button Name="StatisticsButton" Visibility="Collapsed"/>
-                    <Button Name="DeveloperConsoleButton" Content="⌘  Fejlesztői konzol" Style="{StaticResource UtilityButton}" Margin="0,0,0,8" Visibility="Collapsed"/>
-                    <Button Name="OwnerModeButton" Visibility="Collapsed"/>
-                    <Button Name="RollbackButton" Visibility="Collapsed"/>
-                  </StackPanel>
-                </Border>
-              </Grid>
-              <Border Grid.Row="2" Background="#150B0D" CornerRadius="12" Padding="14,10" BorderBrush="#352026" BorderThickness="1" Margin="0,12,0,0">
-                <DockPanel>
-                  <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="HANGFELDOLGOZÁS" Foreground="#A66B74" FontSize="10" FontWeight="Bold"/>
-                    <TextBlock Text="Az Equalizer APO eredeti hangjára vált vissza." Foreground="#6F7888" FontSize="11" Margin="0,3,0,0"/>
-                  </StackPanel>
-                  <Button Name="BypassButton" Content="⛨  Biztonságos mód" Style="{StaticResource DangerButton}" HorizontalAlignment="Right" Margin="16,0,0,0" ToolTip="A SoundLift hanghatásainak azonnali kikapcsolása és az eredeti hang visszaállítása"/>
-                </DockPanel>
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <WrapPanel VerticalAlignment="Center">
+                <CheckBox Name="StartupCheck" Content="Indítás a Windowssal"/>
+                <CheckBox Name="DoNotDisturbCheck" Content="Ne zavarjanak mód"/>
+                <CheckBox Name="AutoProfileCheck" Visibility="Collapsed" IsChecked="False"/>
+                <CheckBox Name="NightModeCheck" Visibility="Collapsed" IsChecked="False"/>
+                <CheckBox Name="OverlayCheck" Visibility="Collapsed" IsChecked="False"/>
+                <CheckBox Name="DiscordPresenceCheck" Visibility="Collapsed" IsChecked="False"/>
+              </WrapPanel>
+              <Border Grid.Column="1" Background="#12291F" CornerRadius="9" Padding="12,7">
+                <TextBlock Name="ClipText" Text="VÉDVE" Foreground="#4ADE80" FontWeight="Bold" FontSize="10"/>
               </Border>
             </Grid>
+          </Border>
+
+          <UniformGrid Columns="4" Margin="0,0,0,12">
+            <Border Style="{StaticResource DashboardCard}" Padding="13" Margin="0,0,8,0"><StackPanel><TextBlock Text="▤" FontSize="19" Foreground="{DynamicResource AccentTextBrush}"/><TextBlock Text="Profilkezelés" FontWeight="Bold" Margin="0,5,0,2"/><Button Name="ProfileManagerButton" Content="Megnyitás" Style="{StaticResource UtilityButton}" Margin="0,8,0,0"/><Button Name="SaveButton" Visibility="Collapsed"/><Button Name="LoadButton" Visibility="Collapsed"/><Button Name="ExportButton" Visibility="Collapsed"/><Button Name="ImportButton" Visibility="Collapsed"/></StackPanel></Border>
+            <Border Style="{StaticResource DashboardCard}" Padding="13" Margin="0,0,8,0"><StackPanel><TextBlock Text="▣" FontSize="19" Foreground="{DynamicResource AccentTextBrush}"/><TextBlock Text="Hangteszt" FontWeight="Bold" Margin="0,5,0,2"/><Button Name="TestButton" Content="60 Hz teszt" Style="{StaticResource UtilityButton}" Margin="0,8,0,0"/></StackPanel></Border>
+            <Border Style="{StaticResource DashboardCard}" Padding="13" Margin="0,0,8,0"><StackPanel><TextBlock Text="✚" FontSize="19" Foreground="{DynamicResource AccentTextBrush}"/><TextBlock Text="Automatikus javítás" FontWeight="Bold" Margin="0,5,0,2"/><Button Name="RepairApoButton" Content="APO javítása" Style="{StaticResource UtilityButton}" Margin="0,8,0,0"/></StackPanel></Border>
+            <Border Style="{StaticResource DashboardCard}" Padding="13"><StackPanel><TextBlock Text="↻" FontSize="19" Foreground="{DynamicResource AccentTextBrush}"/><TextBlock Text="Frissítés" FontWeight="Bold" Margin="0,5,0,2"/><Button Name="UpdateButton" Content="Keresés" Style="{StaticResource UtilityButton}" Margin="0,8,0,0"/></StackPanel></Border>
+          </UniformGrid>
+
+          <Border Style="{StaticResource DashboardCard}" Padding="15">
+            <WrapPanel>
+              <Button Name="AppVolumeButton" Content="▥  Alkalmazások hangereje" Style="{StaticResource UtilityButton}"/>
+              <Button Name="MicrophoneButton" Content="◉  Mikrofonjavítás" Style="{StaticResource UtilityButton}"/>
+              <Button Name="UndoButton" Content="↶  Visszavonás" Style="{StaticResource UtilityButton}"/>
+              <Button Name="ReportProblemButton" Content="⚑  Hibajelentés" Style="{StaticResource UtilityButton}"/>
+              <Button Name="BypassButton" Content="⛨  Biztonságos mód" Style="{StaticResource DangerButton}"/>
+              <Button Name="StatisticsButton" Visibility="Collapsed"/>
+              <Button Name="DeveloperConsoleButton" Visibility="Collapsed"/>
+              <Button Name="OwnerModeButton" Visibility="Collapsed"/>
+              <Button Name="RollbackButton" Visibility="Collapsed"/>
+            </WrapPanel>
           </Border>
         </StackPanel>
       </ScrollViewer>
@@ -1290,9 +1201,9 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V2.0.0'
+$script:trayIcon.Text = 'SoundLift V2.0.1'
 $script:trayIcon.Visible = $true
-$names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','CustomThemeButton','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
+$names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
 $VolumeSlider.ToolTip = 'A teljes hangerő erősítése 0 és 300% között.'
 $BassSlider.ToolTip = 'A mélyhangok kiemelése. Nagy értéknél használd a torzításvédelmet.'
@@ -1365,7 +1276,7 @@ function Set-AppTheme([string]$themeName) {
     foreach ($label in $script:eqValueLabels) { $label.Foreground = $window.Resources['AccentTextBrush'] }
     foreach ($label in $script:eqBandLabels) { $label.Foreground = $window.Resources['MutedTextBrush'] }
     $window.Foreground = $window.Resources['PrimaryTextBrush']
-    foreach ($control in @($MusicButton,$GameButton,$CombatButton,$R6Button,$DiscordButton,$MovieButton,$HeavyButton,$ResetButton,$ExtraBassProButton,$VoiceBoostButton,$CustomPresetXButton,$ProfileOrderButton,$CustomThemeButton,$CopySupportIdButton,$LicenseButton,$AboutButton,$PrivacyButton,$SaveButton,$LoadButton,$ExportButton,$ImportButton,$UndoButton,$TestButton,$DeviceButton,$AppVolumeButton,$MicrophoneButton,$DiagnosticsButton,$RepairApoButton,$ReportProblemButton,$UpdateButton,$RollbackButton,$OwnerModeButton,$ChangelogButton,$HotkeyButton,$StatisticsButton,$DeveloperConsoleButton)) {
+    foreach ($control in @($MusicButton,$GameButton,$CombatButton,$R6Button,$DiscordButton,$MovieButton,$HeavyButton,$ResetButton,$ExtraBassProButton,$VoiceBoostButton,$CustomPresetXButton,$ProfileOrderButton,$CopySupportIdButton,$LicenseButton,$AboutButton,$PrivacyButton,$SaveButton,$LoadButton,$ExportButton,$ImportButton,$UndoButton,$TestButton,$DeviceButton,$AppVolumeButton,$MicrophoneButton,$DiagnosticsButton,$RepairApoButton,$ReportProblemButton,$UpdateButton,$RollbackButton,$OwnerModeButton,$ChangelogButton,$HotkeyButton,$StatisticsButton,$DeveloperConsoleButton)) {
         if ($control) { $control.Foreground = $window.Resources['PrimaryTextBrush'] }
     }
     foreach ($checkBox in @($SafetyCheck,$AutoProfileCheck,$InstantCheck,$StartupCheck,$DoNotDisturbCheck,$NightModeCheck,$OverlayCheck,$DiscordPresenceCheck)) { if ($checkBox) { $checkBox.Foreground = $window.Resources['SecondaryTextBrush'] } }
@@ -1373,39 +1284,14 @@ function Set-AppTheme([string]$themeName) {
     $VersionText.Foreground = $window.Resources['MutedTextBrush']; $SupportIdText.Foreground = $window.Resources['MutedTextBrush']; $LicenseStatusText.Foreground = $window.Resources['MutedTextBrush']
     $ApplyButton.Foreground = $window.Resources['AccentContrastBrush']
     $script:themeName = $themeName
-    if ($CustomThemeButton) { $CustomThemeButton.Visibility = $(if($themeName -eq 'Egyéni téma'){'Visible'}else{'Collapsed'}) }
     try { $handle=[Windows.Interop.WindowInteropHelper]::new($window).Handle; $dark=$(if($theme.IsLight){0}else{1}); [void][AudioAppNative]::DwmSetWindowAttribute($handle,20,[ref]$dark,4) } catch { }
-}
-
-function Show-SoundLiftCustomThemeEditor {
-    $palette = Get-SoundLiftThemePalette
-    $dialog=[Windows.Window]::new();$dialog.Title='SoundLift – Egyéni téma';$dialog.Width=590;$dialog.Height=455;$dialog.ResizeMode='NoResize';$dialog.Owner=$window;Set-SoundLiftWindowStyle $dialog
-    $root=[Windows.Controls.Grid]::new();$root.Margin=[Windows.Thickness]::new(28)
-    $root.RowDefinitions.Add([Windows.Controls.RowDefinition]::new());$actionsRow=[Windows.Controls.RowDefinition]::new();$actionsRow.Height=[Windows.GridLength]::Auto;$root.RowDefinitions.Add($actionsRow)
-    $content=[Windows.Controls.StackPanel]::new();$title=[Windows.Controls.TextBlock]::new();$title.Text='Egyéni téma';$title.FontSize=25;$title.FontWeight='Bold';$title.Foreground=New-SoundLiftBrush $palette.Accent
-    $info=[Windows.Controls.TextBlock]::new();$info.Text='Válassz három színt. A SoundLift automatikusan jól olvasható szövegszínt használ a gombokon.';$info.TextWrapping='Wrap';$info.FontSize=13;$info.LineHeight=20;$info.Foreground=New-SoundLiftBrush $palette.Secondary;$info.Margin=[Windows.Thickness]::new(0,6,0,20)
-    [void]$content.Children.Add($title);[void]$content.Children.Add($info)
-    $fields=@{}
-    foreach($item in @(@('Main','Főszín',$script:customTheme.Main),@('Background','Háttérszín',$script:customTheme.Background),@('Accent','Kiemelőszín',$script:customTheme.Accent))){
-        $line=[Windows.Controls.Grid]::new();$line.Margin=[Windows.Thickness]::new(0,0,0,12);$line.ColumnDefinitions.Add([Windows.Controls.ColumnDefinition]::new());$inputColumn=[Windows.Controls.ColumnDefinition]::new();$inputColumn.Width=[Windows.GridLength]::new(165);$line.ColumnDefinitions.Add($inputColumn);$buttonColumn=[Windows.Controls.ColumnDefinition]::new();$buttonColumn.Width=[Windows.GridLength]::new(125);$line.ColumnDefinitions.Add($buttonColumn)
-        $label=[Windows.Controls.TextBlock]::new();$label.Text=$item[1];$label.VerticalAlignment='Center';$label.FontSize=14;$label.Foreground=New-SoundLiftBrush $palette.Primary
-        $input=[Windows.Controls.TextBox]::new();$input.Text=$item[2];$input.Height=38;$input.Padding=[Windows.Thickness]::new(10,7,10,7);$input.Margin=[Windows.Thickness]::new(12,0,10,0);[Windows.Controls.Grid]::SetColumn($input,1)
-        $choose=[Windows.Controls.Button]::new();$choose.Content='Szín kiválasztása';$choose.Height=38;$choose.Tag=$input;[Windows.Controls.Grid]::SetColumn($choose,2)
-        $choose.Add_Click({$target=[Windows.Controls.TextBox]$this.Tag;$picker=[Windows.Forms.ColorDialog]::new();try{$picker.Color=[Drawing.ColorTranslator]::FromHtml($target.Text)}catch{};if($picker.ShowDialog()-eq [Windows.Forms.DialogResult]::OK){$target.Text=('#{0:X2}{1:X2}{2:X2}' -f $picker.Color.R,$picker.Color.G,$picker.Color.B)};$picker.Dispose()})
-        [void]$line.Children.Add($label);[void]$line.Children.Add($input);[void]$line.Children.Add($choose);[void]$content.Children.Add($line);$fields[$item[0]]=$input
-    }
-    [void]$root.Children.Add($content)
-    $actions=[Windows.Controls.StackPanel]::new();$actions.Orientation='Horizontal';$actions.HorizontalAlignment='Right';$actions.Margin=[Windows.Thickness]::new(0,20,0,0);[Windows.Controls.Grid]::SetRow($actions,1)
-    $cancel=[Windows.Controls.Button]::new();$cancel.Content='Mégse';$cancel.Width=110;$cancel.Margin=[Windows.Thickness]::new(0,0,10,0);$cancel.Tag=$dialog;$cancel.Add_Click({$this.Tag.Close()})
-    $save=[Windows.Controls.Button]::new();$save.Content='Mentés';$save.Width=125;$save.Tag=[PSCustomObject]@{Dialog=$dialog;Main=$fields.Main;Background=$fields.Background;Accent=$fields.Accent};$save.Add_Click({$ctx=$this.Tag;$values=@{Main=[string]$ctx.Main.Text;Background=[string]$ctx.Background.Text;Accent=[string]$ctx.Accent.Text};foreach($value in $values.Values){if($value -notmatch '^#[0-9A-Fa-f]{6}$'){Show-SoundLiftMessage 'A színeket #RRGGBB formában add meg, például: #22D3EE.' 'Hibás színkód' 'OK' 'Warning' $ctx.Dialog|Out-Null;return}};$script:customTheme=$values;Set-AppTheme 'Egyéni téma';try{(Get-AppState)|ConvertTo-Json -Depth 5|Set-Content -LiteralPath $settingsPath -Encoding UTF8}catch{};$ctx.Dialog.DialogResult=$true})
-    [void]$actions.Children.Add($cancel);[void]$actions.Children.Add($save);[void]$root.Children.Add($actions);$dialog.Content=$root;[void]$dialog.ShowDialog()
 }
 
 $script:themeNames = @(
     'Fekete és piros', 'Fekete és kék', 'Grafit és zöld',
     'Fekete és lila', 'Éjkék és türkiz', 'Grafit és narancs',
     'Fekete és arany', 'OLED fekete', 'Midnight Blue', 'Purple Neon',
-    'Cyberpunk', 'Emerald', 'Carbon Gold', 'Egyéni téma'
+    'Cyberpunk', 'Emerald', 'Carbon Gold'
 )
 foreach ($themeOptionName in $script:themeNames) { [void]$ThemeCombo.Items.Add($themeOptionName) }
 if ($script:themeNames -notcontains $script:themeName) { $script:themeName = 'Fekete és piros' }
@@ -1416,7 +1302,6 @@ $ThemeCombo.Add_SelectionChanged({
         catch { $script:themeName='Fekete és piros';$ThemeCombo.SelectedItem='Fekete és piros';Set-AppTheme 'Fekete és piros' }
     }
 })
-$CustomThemeButton.Add_Click({ Show-SoundLiftCustomThemeEditor })
 try { Set-AppTheme $script:themeName } catch { $script:themeName='Fekete és piros';$ThemeCombo.SelectedItem='Fekete és piros';Set-AppTheme 'Fekete és piros' }
 
 function Set-EqValues([double[]]$values) {
@@ -1687,7 +1572,6 @@ function Invoke-ApplyButton {
 function Get-AppState {
     return [PSCustomObject]@{
         version = 11; profile = $script:activeProfile; theme = $script:themeName
-        customTheme = [PSCustomObject]@{ Main=$script:customTheme.Main; Background=$script:customTheme.Background; Accent=$script:customTheme.Accent }
         onboardingCompleted = [bool]$script:onboardingCompleted
         volume = [int]$VolumeSlider.Value; bass = [int]$BassSlider.Value; frequency = [int]$FrequencySlider.Value
         safety = [bool]$SafetyCheck.IsChecked; autoProfile = $false; instant = [bool]$InstantCheck.IsChecked
@@ -1704,9 +1588,6 @@ function Get-AppState {
 
 function Set-AppState($state) {
     if (-not $state) { return }
-    if ($state.customTheme) {
-        foreach ($key in @('Main','Background','Accent')) { if ([string]$state.customTheme.$key -match '^#[0-9A-Fa-f]{6}$') { $script:customTheme[$key]=[string]$state.customTheme.$key } }
-    }
     $script:activeProfile = if ($state.profile) { [string]$state.profile } else { 'Custom' }
     Set-Profile ([int]$state.volume) ([int]$state.bass) ([int]$state.frequency) ([bool]$state.safety)
     if ($state.eq -and $state.eq.Count -eq 10) { Set-EqValues ([double[]]$state.eq) }
@@ -2499,6 +2380,12 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V2.0.1 – REFERENCIAHŰ DASHBOARD
+• A főablak elrendezése teljesen megújult a kiválasztott fekete-piros SoundLift látványterv alapján.
+• Új bal oldali navigáció, központi hangerőmérő, kompakt hangvezérlők és alsó gyorsfunkció-kártyák.
+• A gyors profilok állandóan láthatók a főképernyő jobb oldalán.
+• Az Egyéni téma és a hozzá tartozó szerkesztő kikerült; a korábbi Egyéni téma automatikusan Fekete és piros témára áll vissza.
+
 V2.0.0 – ÚJ SOUNDLIFT DASHBOARD
 • Teljesen megújult, modernebb fekete-piros főképernyő kártyás elrendezéssel.
 • Az összes hangprofil állandóan látható maradt a Gyors profilok sávban, így nincs szükség külön menü megnyitására.
