@@ -1,10 +1,11 @@
-# SoundLift V2.0.2
+# SoundLift V2.0.3
 
 Modern Windows-hangvezérlő profilokkal, basszuskiemeléssel, tízsávos
 equalizerrel és akár 300%-os hangerő-erősítéssel.
 
-A 2.0.2-es kiadás minden témában egységes, olvasható felületet és kisebb
-ablakméreten is kiférő vezérlőket kapott. A gyors profilok
+A 2.0.3-as kiadás minden témában egységes, olvasható felületet, rejtett
+görgetősávokat és témaszínű profilkezelő menüt kapott. A vezérlők kisebb
+ablakméreten is kiférnek. A gyors profilok
 mindig láthatók a főképernyőn, ezért profilváltáshoz nem kell külön menüt megnyitni.
 
 A FiveM-profilok egyértelműen FiveM RP és FiveM PvP néven jelennek meg.

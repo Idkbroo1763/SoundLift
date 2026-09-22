@@ -1,8 +1,34 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { storeAndForwardEvent } from "../_shared/backend-logger.ts";
 
-const htmlHeaders = { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'" };
-const page = (ok: boolean, message: string, status = 200) => new Response(`<!doctype html><meta charset="utf-8"><title>SoundLift</title><style>body{font-family:Segoe UI,sans-serif;background:#09090b;color:#f8fafc;display:grid;place-items:center;height:100vh;margin:0}.box{max-width:560px;padding:36px;border:1px solid #27272a;border-radius:18px;background:#18181b;text-align:center}h1{color:${ok ? "#22c55e" : "#ef4444"}}</style><div class="box"><h1>${ok ? "Sikeres összekapcsolás" : "Az összekapcsolás sikertelen"}</h1><p>${message}</p><p>Most visszatérhetsz a SoundLift alkalmazásba.</p></div>`, { status, headers: htmlHeaders });
+const htmlHeaders = new Headers({
+  "Content-Type": "text/html; charset=UTF-8",
+  "Cache-Control": "no-store",
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff",
+  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+});
+
+const page = (ok: boolean, message: string, status = 200) => {
+  const accent = ok ? "#4ade80" : "#fb7185";
+  const icon = ok ? "✓" : "!";
+  const title = ok ? "Sikeres összekapcsolás" : "Az összekapcsolás sikertelen";
+  const html = `<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SoundLift – Discord</title>
+  <style>
+    *{box-sizing:border-box}body{font-family:"Segoe UI",Arial,sans-serif;background:radial-gradient(circle at top,#260b13 0,#09090b 48%,#050506 100%);color:#f8fafc;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px}.box{width:min(100%,620px);padding:42px;border:1px solid #3f2630;border-radius:22px;background:rgba(18,18,22,.96);box-shadow:0 24px 80px rgba(0,0,0,.55);text-align:center}.brand{color:#ff4d67;font-size:13px;font-weight:800;letter-spacing:.18em;margin-bottom:24px}.icon{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 20px;border:2px solid ${accent};border-radius:50%;color:${accent};font-size:34px;font-weight:800;background:#0c0c10}h1{margin:0 0 14px;color:${accent};font-size:clamp(25px,5vw,36px)}p{margin:10px 0;color:#d4d9e2;font-size:16px;line-height:1.65}.hint{margin-top:25px;padding:14px 18px;border:1px solid #303038;border-radius:12px;background:#0c0c10;color:#aeb7c6}
+  </style>
+</head>
+<body><main class="box"><div class="brand">SOUNDLIFT</div><div class="icon">${icon}</div><h1>${title}</h1><p>${message}</p><p class="hint">Ezt a lapot bezárhatod, majd visszatérhetsz a SoundLift alkalmazásba.</p></main></body>
+</html>`;
+  // A kódolt bájttömb és a pontos HTML MIME-típus megakadályozza, hogy az
+  // Edge Function átjáró forráskódként vagy hibás ékezetekkel jelenítse meg.
+  return new Response(new TextEncoder().encode(html), { status, headers: htmlHeaders });
+};
 
 async function sha256(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));

@@ -29,8 +29,8 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '2.0.2'")) { throw 'Application version was not updated to 2.0.2' }
-foreach ($requiredV2DashboardFragment in @('SoundLift V2.0.2', 'GYORS PROFILOK', 'QuickProfileButton', 'DashboardCard', 'SOUNDLIFT PRO', 'ProfileManagerButton', 'PART_Popup', 'AccentContrastBrush', '<UniformGrid Columns="3">', "`$activeButton.Background = `$window.Resources['AccentGradient']")) {
+if (-not $source.Contains("`$script:appVersion = '2.0.3'")) { throw 'Application version was not updated to 2.0.3' }
+foreach ($requiredV2DashboardFragment in @('SoundLift V2.0.3', 'GYORS PROFILOK', 'QuickProfileButton', 'DashboardCard', 'SOUNDLIFT PRO', 'ProfileManagerButton', 'PART_Popup', 'AccentContrastBrush', '<UniformGrid Columns="3">', 'ThemedContextMenu', 'ThemedMenuItem', "`$activeButton.Background = `$window.Resources['AccentGradient']")) {
  if (-not $source.Contains($requiredV2DashboardFragment)) { throw "Missing V2.0 dashboard behavior: $requiredV2DashboardFragment" }
 }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
@@ -142,6 +142,31 @@ if(([regex]::Matches($source,[regex]::Escape('$script:trayIcon.Dispose()'))).Cou
 if ([regex]::IsMatch($source, '(?m)^\$presenceTimer\.Start\(\)\s*$')) { throw 'Removed Discord presence timer must not start' }
 if ([regex]::IsMatch($source, '(?m)^\$autoTimer\.Start\(\)\s*$')) { throw 'Removed automatic profile timer must not start' }
 if ($source.Contains('Check-AppUpdate -Silent')) { throw 'Blocking startup update check is still enabled' }
+
+foreach($startupLogFix in @(
+    "Write-SoundLiftLog -Category startup -EventName 'initialization_succeeded'",
+    '[void](Send-SoundLiftPendingLogs)'
+)) {
+    if (-not $source.Contains($startupLogFix)) { throw "Missing successful startup log delivery fix: $startupLogFix" }
+}
+
+foreach($firstRunThemeFix in @(
+    '$profileChoice.Template = $ThemeCombo.Template',
+    '$profileChoice.Resources[$resourceKey] = $ThemeCombo.Resources[$resourceKey]',
+    '$profileChoice.Background=$wizard.Resources[''ControlBrush'']'
+)) {
+    if (-not $source.Contains($firstRunThemeFix)) { throw "Missing themed first-run profile selector fix: $firstRunThemeFix" }
+}
+
+$callbackSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\licensing\discord-link-callback\index.ts') -Raw
+foreach($callbackUiFix in @(
+    '"Content-Type": "text/html; charset=UTF-8"',
+    'new TextEncoder().encode(html)',
+    '<meta name="viewport" content="width=device-width,initial-scale=1">',
+    'SOUNDLIFT'
+)) {
+    if (-not $callbackSource.Contains($callbackUiFix)) { throw "Missing Discord callback HTML/UTF-8 fix: $callbackUiFix" }
+}
 $installerSource = Get-Content "$PSScriptRoot/../installer.iss" -Raw
 $uninstallerSource = Get-Content "$PSScriptRoot/../Uninstall-SoundLift.ps1" -Raw
 foreach ($requiredCleanupMarker in @('[UninstallRun]', 'Uninstall-SoundLift.ps1')) {
@@ -161,6 +186,9 @@ if ($source.Contains("'Cyberpunk', 'Emerald', 'Arctic', 'R6 Siege'")) { throw 'R
 if ($source.Contains('CustomThemeButton') -or $source.Contains('Show-SoundLiftCustomThemeEditor') -or $source.Contains('$script:customTheme')) { throw 'The removed custom theme implementation is still present' }
 foreach ($requiredUiFix in @(
     '<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden"',
+    '<Style TargetType="ScrollBar">',
+    "`$element.Visibility = 'Collapsed'",
+    "`$menu.Style = `$window.Resources['ThemedContextMenu']",
     'function Test-SoundLiftProblemReportService',
     'function Test-SoundLiftProblemReportQueued',
     'Test-Path $script:logQueueFile',
@@ -223,7 +251,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='2.0.2'
+ $script:appVersion='2.0.3'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }
