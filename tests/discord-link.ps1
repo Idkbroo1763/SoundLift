@@ -2,7 +2,14 @@ $ErrorActionPreference='Stop'
 $source = Get-Content "$PSScriptRoot/../SoundLift.ps1" -Raw
 $tokens=$null; $errors=$null
 $ast=[System.Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$errors)
-if ($errors.Count) { throw ($errors | Out-String) }
+if ($errors.Count) {
+    foreach ($parseError in $errors) {
+        $safeMessage = ([string]$parseError.Message) -replace '[^\x20-\x7E]', '?'
+        $safeText = ([string]$parseError.Extent.Text) -replace '[^\x20-\x7E]', '?'
+        Write-Host ("PARSE_ERROR line={0} column={1} text={2} message={3}" -f $parseError.Extent.StartLineNumber,$parseError.Extent.StartColumnNumber,$safeText,$safeMessage)
+    }
+    throw 'SoundLift.ps1 parse validation failed.'
+}
 $function = $ast.Find({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Test-DiscordLinkOfflineGrace'},$true)
 Invoke-Expression $function.Extent.Text
 $script:installationId='test-install'; $script:discordLinkGraceHours=720
