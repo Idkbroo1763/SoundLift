@@ -2231,18 +2231,40 @@ function Install-SoundLiftUpdate([object]$release, [version]$latestVersion, [Win
         $helperPath = Join-Path $temporaryDirectory 'install-update.ps1'
         $escapedInstallerPath = $installerPath.Replace("'", "''")
         $escapedLaunchPath = $script:appLaunchPath.Replace("'", "''")
+        $updateLogPath = Join-Path $appDataDirectory 'update-installer.log'
+        $escapedUpdateLogPath = $updateLogPath.Replace("'", "''")
         $currentProcessId = [Diagnostics.Process]::GetCurrentProcess().Id
         $helperSource = @"
 `$ErrorActionPreference = 'Stop'
 `$installerPath = '$escapedInstallerPath'
 `$applicationPath = '$escapedLaunchPath'
+`$logPath = '$escapedUpdateLogPath'
 `$soundLiftProcessId = $currentProcessId
-try { Wait-Process -Id `$soundLiftProcessId -ErrorAction SilentlyContinue } catch { }
-`$installerProcess = Start-Process -FilePath `$installerPath -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CLOSEAPPLICATIONS') -Wait -PassThru
-if (`$installerProcess.ExitCode -notin @(0, 3010)) { exit `$installerProcess.ExitCode }
-Start-Sleep -Milliseconds 800
-if (-not (Test-Path -LiteralPath `$applicationPath)) { exit 2 }
-Start-Process -FilePath `$applicationPath
+function Write-UpdateLog([string]`$message) {
+    try { Add-Content -LiteralPath `$logPath -Value (('[{0}] {1}' -f [DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'), `$message)) -Encoding UTF8 } catch { }
+}
+try {
+    Write-UpdateLog 'A frissítési segéd elindult.'
+    `$deadline = [DateTime]::UtcNow.AddSeconds(12)
+    while ([DateTime]::UtcNow -lt `$deadline -and (Get-Process -Id `$soundLiftProcessId -ErrorAction SilentlyContinue)) { Start-Sleep -Milliseconds 250 }
+    `$oldProcess = Get-Process -Id `$soundLiftProcessId -ErrorAction SilentlyContinue
+    if (`$oldProcess) {
+        Write-UpdateLog 'A régi SoundLift nem állt le időben; kényszerített leállítás következik.'
+        Stop-Process -Id `$soundLiftProcessId -Force -ErrorAction Stop
+        Start-Sleep -Milliseconds 500
+    }
+    Write-UpdateLog 'A telepítő indítása.'
+    `$installerProcess = Start-Process -FilePath `$installerPath -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CLOSEAPPLICATIONS') -Wait -PassThru -ErrorAction Stop
+    Write-UpdateLog ("A telepítő kilépési kódja: {0}" -f `$installerProcess.ExitCode)
+    if (`$installerProcess.ExitCode -notin @(0, 3010)) { exit `$installerProcess.ExitCode }
+    Start-Sleep -Milliseconds 800
+    if (-not (Test-Path -LiteralPath `$applicationPath)) { throw 'A telepített SoundLift.exe nem található.' }
+    Start-Process -FilePath `$applicationPath -ErrorAction Stop
+    Write-UpdateLog 'Az új SoundLift elindult.'
+} catch {
+    Write-UpdateLog ("HIBA: {0}" -f `$_.Exception.Message)
+    exit 1
+}
 "@
         [IO.File]::WriteAllText($helperPath, $helperSource, [Text.UTF8Encoding]::new($true))
         $windowsPowerShell = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -2275,7 +2297,9 @@ function Show-AppUpdateDialog([object]$release, [version]$latestVersion) {
     $later.Add_Click({ $dialog.Close() }.GetNewClosure())
     $install.Add_Click({
         if (Install-SoundLiftUpdate $release $latestVersion $status $install $progress) {
-            $dialog.Close(); $script:reallyExit=$true; $window.Close()
+            $dialog.Close(); $script:reallyExit=$true
+            if ($script:trayIcon) { $script:trayIcon.Visible=$false; $script:trayIcon.Dispose() }
+            $window.Close()
         }
     }.GetNewClosure())
     $buttons.Children.Add($later)|Out-Null; $buttons.Children.Add($install)|Out-Null
@@ -2448,6 +2472,7 @@ V2.0.3 – LETISZTULT GÖRGETÉS ÉS PROFILMENÜ
 • A sikeres alkalmazásindítás naplója azonnal elküldésre kerül a Discordra.
 • A Discord-fiók összekapcsolása modern, helyes ékezetes visszaigazoló oldalt kapott.
 • Az első indítás ajánlott profilválasztója minden témában olvasható.
+• Az automatikus frissítő akkor is elindítja a telepítőt, ha a régi tálcaikon miatt a folyamat nem áll le magától.
 
 V2.0.2 – EGYSÉGES, OLVASHATÓ TÉMÁK
 • Minden főképernyős vezérlő, állapotjelzés és lenyíló lista követi a kiválasztott témát.

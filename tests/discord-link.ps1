@@ -145,7 +145,10 @@ foreach ($requiredTrayLifecycleFeature in @(
 $trayCreation=$source.IndexOf('$script:trayIcon = New-Object Windows.Forms.NotifyIcon')
 $trayMenuCreation=$source.IndexOf('$trayMenu = New-Object Windows.Forms.ContextMenuStrip')
 if($trayCreation -lt 0 -or $trayCreation -gt $trayMenuCreation){throw 'NotifyIcon is not created before tray menu initialization'}
-if(([regex]::Matches($source,[regex]::Escape('$script:trayIcon.Dispose()'))).Count -ne 1){throw 'NotifyIcon must be disposed exactly once, by the real Exit action'}
+if(([regex]::Matches($source,[regex]::Escape('$script:trayIcon.Dispose()'))).Count -ne 2){throw 'NotifyIcon must be disposed by both real Exit and automatic update shutdown'}
+foreach($requiredUpdaterFix in @("`$deadline = [DateTime]::UtcNow.AddSeconds(12)",'Stop-Process -Id `$soundLiftProcessId -Force',"`$updateLogPath = Join-Path `$appDataDirectory 'update-installer.log'","`$script:trayIcon.Visible=`$false")) {
+    if(-not $source.Contains($requiredUpdaterFix)){throw "Missing automatic updater shutdown fix: $requiredUpdaterFix"}
+}
 if ([regex]::IsMatch($source, '(?m)^\$presenceTimer\.Start\(\)\s*$')) { throw 'Removed Discord presence timer must not start' }
 if ([regex]::IsMatch($source, '(?m)^\$autoTimer\.Start\(\)\s*$')) { throw 'Removed automatic profile timer must not start' }
 if ($source.Contains('Check-AppUpdate -Silent')) { throw 'Blocking startup update check is still enabled' }
@@ -228,7 +231,7 @@ foreach ($requiredUpdaterFragment in @(
  "Get-FileHash -LiteralPath `$installerPath -Algorithm SHA256",
  "`$assetUri.Scheme -ne 'https' -or `$assetUri.Host -ne 'github.com'",
  "`$helperPath = Join-Path `$temporaryDirectory 'install-update.ps1'",
- 'Wait-Process -Id',
+ 'Get-Process -Id `$soundLiftProcessId',
  "'/VERYSILENT'",
  '-Wait -PassThru',
  'Start-Process -FilePath `$applicationPath',
