@@ -36,8 +36,8 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '2.0.3'")) { throw 'Application version was not updated to 2.0.3' }
-foreach ($requiredV2DashboardFragment in @('SoundLift V2.0.3', 'GYORS PROFILOK', 'QuickProfileButton', 'DashboardCard', 'SOUNDLIFT PRO', 'ProfileManagerButton', 'PART_Popup', 'AccentContrastBrush', '<UniformGrid Columns="3">', 'ThemedContextMenu', 'ThemedMenuItem', "`$activeButton.Background = `$window.Resources['AccentGradient']")) {
+if (-not $source.Contains("`$script:appVersion = '2.0.4'")) { throw 'Application version was not updated to 2.0.4' }
+foreach ($requiredV2DashboardFragment in @('SoundLift V2.0.4', 'GYORS PROFILOK', 'QuickProfileButton', 'DashboardCard', 'SOUNDLIFT PRO', 'ProfileManagerButton', 'PART_Popup', 'AccentContrastBrush', '<UniformGrid Columns="3">', 'ThemedContextMenu', 'ThemedMenuItem', "`$activeButton.Background = `$window.Resources['AccentGradient']")) {
  if (-not $source.Contains($requiredV2DashboardFragment)) { throw "Missing V2.0 dashboard behavior: $requiredV2DashboardFragment" }
 }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
@@ -66,8 +66,6 @@ foreach ($requiredGameAndMicrophoneFix in @(
     if (-not $source.Contains($requiredGameAndMicrophoneFix)) { throw "Missing game focus or microphone volume fix: $requiredGameAndMicrophoneFix" }
 }
 foreach ($removedVisibleFeature in @(
-    'Content="Automatikus profilváltás"', 'Content="Éjszakai mód"',
-    'Content="Profilváltási jelzés"', 'Content="Discord-állapot megjelenítése"',
     'Content="▤  Statisztikák"', 'Content="⚙  Tulajdonosi tesztmód"',
     'Content="↶  Korábbi verzió visszaállítása"', "Content='Mikrofon teszt'",
     "Content='Zajszűrés kérése", "Content='Beszédkiegyenlítés"
@@ -149,8 +147,9 @@ if(([regex]::Matches($source,[regex]::Escape('$script:trayIcon.Dispose()'))).Cou
 foreach($requiredUpdaterFix in @("`$deadline = [DateTime]::UtcNow.AddSeconds(12)",'Stop-Process -Id `$soundLiftProcessId -Force',"`$updateLogPath = Join-Path `$appDataDirectory 'update-installer.log'","`$script:trayIcon.Visible=`$false")) {
     if(-not $source.Contains($requiredUpdaterFix)){throw "Missing automatic updater shutdown fix: $requiredUpdaterFix"}
 }
-if ([regex]::IsMatch($source, '(?m)^\$presenceTimer\.Start\(\)\s*$')) { throw 'Removed Discord presence timer must not start' }
-if ([regex]::IsMatch($source, '(?m)^\$autoTimer\.Start\(\)\s*$')) { throw 'Removed automatic profile timer must not start' }
+foreach($restoredOption in @('Content="Automatikus profilváltás"','Content="Éjszakai mód"','Content="Profilváltási jelzés"','Content="Discord-állapot"','$autoTimer.Start()','$presenceTimer.Start()')) {
+    if(-not $source.Contains($restoredOption)){throw "Missing restored option: $restoredOption"}
+}
 if ($source.Contains('Check-AppUpdate -Silent')) { throw 'Blocking startup update check is still enabled' }
 
 foreach($startupLogFix in @(
@@ -261,7 +260,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='2.0.3'
+ $script:appVersion='2.0.4'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }

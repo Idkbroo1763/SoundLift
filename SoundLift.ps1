@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '2.0.3'
+$script:appVersion = '2.0.4'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -816,7 +816,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V2.0.3" Width="1280" Height="800" MinWidth="1024" MinHeight="700"
+        Title="SoundLift V2.0.4" Width="1280" Height="800" MinWidth="1024" MinHeight="700"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -1073,7 +1073,7 @@ $xaml = @'
               <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,3,0,0"/>
             </StackPanel>
           </Border>
-          <TextBlock Name="VersionText" Text="Telepített verzió: 2.0.3" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="4,0,0,3"/>
+          <TextBlock Name="VersionText" Text="Telepített verzió: 2.0.4" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="4,0,0,3"/>
           <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" FontSize="9" Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis" Margin="4,0,0,4"/>
           <Button Name="CopySupportIdButton" Content="⧉  ID másolása" Style="{StaticResource UtilityButton}" Margin="0"/>
         </StackPanel>
@@ -1190,13 +1190,13 @@ $xaml = @'
           <Border Style="{StaticResource DashboardCard}" Margin="0,0,0,12" Padding="16,12">
             <Grid>
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-              <WrapPanel VerticalAlignment="Center">
+              <WrapPanel VerticalAlignment="Center" Margin="0,0,12,0">
                 <CheckBox Name="StartupCheck" Content="Indítás a Windowssal"/>
                 <CheckBox Name="DoNotDisturbCheck" Content="Ne zavarjanak mód"/>
-                <CheckBox Name="AutoProfileCheck" Visibility="Collapsed" IsChecked="False"/>
-                <CheckBox Name="NightModeCheck" Visibility="Collapsed" IsChecked="False"/>
-                <CheckBox Name="OverlayCheck" Visibility="Collapsed" IsChecked="False"/>
-                <CheckBox Name="DiscordPresenceCheck" Visibility="Collapsed" IsChecked="False"/>
+                <CheckBox Name="AutoProfileCheck" Content="Automatikus profilváltás" IsChecked="False"/>
+                <CheckBox Name="NightModeCheck" Content="Éjszakai mód" IsChecked="False"/>
+                <CheckBox Name="OverlayCheck" Content="Profilváltási jelzés" IsChecked="False"/>
+                <CheckBox Name="DiscordPresenceCheck" Content="Discord-állapot" IsChecked="False"/>
               </WrapPanel>
               <Border Grid.Column="1" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource AccentTextBrush}" BorderThickness="1" CornerRadius="9" Padding="12,7">
                 <TextBlock Name="ClipText" Text="VÉDVE" Foreground="{DynamicResource AccentTextBrush}" FontWeight="Bold" FontSize="10"/>
@@ -1260,7 +1260,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V2.0.3'
+$script:trayIcon.Text = 'SoundLift V2.0.4'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -1635,11 +1635,11 @@ function Get-AppState {
         version = 11; profile = $script:activeProfile; theme = $script:themeName
         onboardingCompleted = [bool]$script:onboardingCompleted
         volume = [int]$VolumeSlider.Value; bass = [int]$BassSlider.Value; frequency = [int]$FrequencySlider.Value
-        safety = [bool]$SafetyCheck.IsChecked; autoProfile = $false; instant = [bool]$InstantCheck.IsChecked
+        safety = [bool]$SafetyCheck.IsChecked; autoProfile = [bool]$AutoProfileCheck.IsChecked; instant = [bool]$InstantCheck.IsChecked
         doNotDisturb = [bool]$DoNotDisturbCheck.IsChecked
-        nightMode = $false
-        profileOverlay = $false
-        discordPresence = $false
+        nightMode = [bool]$NightModeCheck.IsChecked
+        profileOverlay = [bool]$OverlayCheck.IsChecked
+        discordPresence = [bool]$DiscordPresenceCheck.IsChecked
         profileOrder = @($script:profileOrder)
         hiddenProfiles = @($script:hiddenProfiles)
         hotkeys = @($script:hotKeyBindings | ForEach-Object { [PSCustomObject]@{ modifiers=[int]$_.modifiers; key=[int]$_.key } })
@@ -1652,12 +1652,12 @@ function Set-AppState($state) {
     $script:activeProfile = if ($state.profile) { [string]$state.profile } else { 'Custom' }
     Set-Profile ([int]$state.volume) ([int]$state.bass) ([int]$state.frequency) ([bool]$state.safety)
     if ($state.eq -and $state.eq.Count -eq 10) { Set-EqValues ([double[]]$state.eq) }
-    $AutoProfileCheck.IsChecked = $false
+    if ($null -ne $state.autoProfile) { $AutoProfileCheck.IsChecked = [bool]$state.autoProfile }
     if ($null -ne $state.instant) { $InstantCheck.IsChecked = [bool]$state.instant }
     if ($null -ne $state.doNotDisturb) { $DoNotDisturbCheck.IsChecked = [bool]$state.doNotDisturb; $script:doNotDisturb = [bool]$state.doNotDisturb }
-    $NightModeCheck.IsChecked = $false
-    $OverlayCheck.IsChecked = $false; $script:profileOverlayEnabled = $false
-    $DiscordPresenceCheck.IsChecked = $false
+    if ($null -ne $state.nightMode) { $NightModeCheck.IsChecked = [bool]$state.nightMode }
+    if ($null -ne $state.profileOverlay) { $OverlayCheck.IsChecked = [bool]$state.profileOverlay; $script:profileOverlayEnabled = [bool]$state.profileOverlay }
+    if ($null -ne $state.discordPresence) { $DiscordPresenceCheck.IsChecked = [bool]$state.discordPresence }
     if ($state.profileOrder) { $script:profileOrder=@($state.profileOrder | ForEach-Object {[string]$_}) }
     if ($state.hiddenProfiles) { $script:hiddenProfiles=@($state.hiddenProfiles | ForEach-Object {[string]$_}) }
     Apply-ProfileLayout
@@ -2465,6 +2465,11 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V2.0.4 – TELJES BEÁLLÍTÁSSÁV
+• Ismét látható az összes főképernyős kapcsoló, több sorba törő elrendezéssel.
+• Visszakerült az automatikus profilváltás, az éjszakai mód, a profilváltási jelzés és a Discord-állapot.
+• A kapcsolók állapota bezárás után is megmarad, a hozzájuk tartozó funkciók pedig valóban elindulnak.
+
 V2.0.3 – LETISZTULT GÖRGETÉS ÉS PROFILMENÜ
 • A világos Windows-görgetősávok minden SoundLift-ablakból eltűntek.
 • Az ablakok és listák továbbra is görgethetők egérgörgővel és érintőpaddal.
@@ -3058,8 +3063,6 @@ $DiscordPresenceCheck.Add_Click({
     else{[void](Set-SoundLiftDiscordPresence '' -Clear);Disconnect-SoundLiftDiscordPresence;$StatusText.Text='A Discord-állapot megjelenítése kikapcsolva'}
     try{(Get-AppState)|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $settingsPath -Encoding UTF8}catch{}
 })
-# A Discord Rich Presence funkció el lett távolítva; az időzítő nem indul el.
-
 # Optional automatic switching: FiveM has priority, followed by Spotify and Discord.
 $script:lastAutoProfile = ''
 $autoTimer = New-Object Windows.Threading.DispatcherTimer
@@ -3079,7 +3082,10 @@ $autoTimer.Add_Tick({
         if ($script:trayIcon -and -not $script:doNotDisturb) { $script:trayIcon.ShowBalloonTip(1800, 'Profilváltás', "$wanted profil bekapcsolva", [Windows.Forms.ToolTipIcon]::Info) }
     }
 })
-# Az automatikus profilváltás el lett távolítva; az időzítő nem indul el.
+$AutoProfileCheck.Add_Click({
+    if($AutoProfileCheck.IsChecked){$autoTimer.Stop();$autoTimer.Start();$StatusText.Text='Automatikus profilváltás bekapcsolva'}else{$autoTimer.Stop();$script:lastAutoProfile='';$StatusText.Text='Automatikus profilváltás kikapcsolva'}
+    try{(Get-AppState)|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $settingsPath -Encoding UTF8}catch{}
+})
 
 # A SoundLift rendszergazdai joggal fut, ezért a Windows a sima Indítópultból
 # nem indítja el megbízhatóan. Bejelentkezéskor egy emelt jogosultságú,
@@ -3170,13 +3176,16 @@ $NightModeCheck.Add_Click({
         $StatusText.Text='Éjszakai mód kikapcsolva'
     }
     if($InstantCheck.IsChecked){Invoke-ApplyButton}
+    try{(Get-AppState)|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $settingsPath -Encoding UTF8}catch{}
 })
-$OverlayCheck.Add_Click({$script:profileOverlayEnabled=[bool]$OverlayCheck.IsChecked;$StatusText.Text=if($script:profileOverlayEnabled){'A profilváltási jelzés bekapcsolva'}else{'A profilváltási jelzés kikapcsolva'}})
+$OverlayCheck.Add_Click({$script:profileOverlayEnabled=[bool]$OverlayCheck.IsChecked;$StatusText.Text=if($script:profileOverlayEnabled){'A profilváltási jelzés bekapcsolva'}else{'A profilváltási jelzés kikapcsolva'};try{(Get-AppState)|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $settingsPath -Encoding UTF8}catch{}})
 
 # Remember the complete UI state between launches.
 if (Test-Path $settingsPath) {
     try { Set-AppState (Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json) } catch { }
 } else { Apply-ProfileLayout }
+if($AutoProfileCheck.IsChecked){$autoTimer.Start()}
+if($DiscordPresenceCheck.IsChecked){$presenceTimer.Start()}
 if (Test-Path $onboardingMarkerPath) { $script:onboardingCompleted = $true }
 $window.Add_Closing({
     try { (Get-AppState) | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $settingsPath -Encoding UTF8 } catch { }
