@@ -25,7 +25,7 @@ $script:appLaunchPath = if ($script:isPackagedExe) {
 } else {
     Join-Path $script:appDirectory 'SoundLift.bat'
 }
-$script:appVersion = '2.0.4'
+$script:appVersion = '2.0.5'
 $script:hotKeyVirtualKeys = @(0x31,0x32,0x33,0x34,0x35,0x36,0x30)
 $script:hotKeyBindings = @($script:hotKeyVirtualKeys | ForEach-Object { [PSCustomObject]@{ modifiers=3; key=[int]$_ } })
 $script:doNotDisturb = $false
@@ -120,7 +120,7 @@ function Set-SoundLiftElementTheme([Windows.DependencyObject]$element, [hashtabl
         $element.Visibility = 'Collapsed'
     } elseif ($element -is [Windows.Controls.TextBlock]) {
         $element.Foreground = if ($element.FontSize -ge 20) { New-SoundLiftBrush $palette.Accent } elseif ($element.FontSize -le 12) { New-SoundLiftBrush $palette.Muted } else { New-SoundLiftBrush $palette.Primary }
-        $element.TextWrapping = if ($element.TextWrapping -eq 'NoWrap') { 'NoWrap' } else { 'Wrap' }
+        if ([string]$element.Text -and ([string]$element.Text).Length -gt 34) { $element.TextWrapping = 'Wrap' }
     } elseif ($element -is [Windows.Controls.Button]) {
         if (-not $element.Style) {
             $element.Background = New-SoundLiftBrush $(if([string]$element.Tag -eq 'PrimaryAction'){$palette.Accent}else{$palette.Control})
@@ -132,6 +132,8 @@ function Set-SoundLiftElementTheme([Windows.DependencyObject]$element, [hashtabl
     } elseif ($element -is [Windows.Controls.TextBox] -or $element -is [Windows.Controls.ComboBox] -or $element -is [Windows.Controls.ListBox]) {
         $element.Background = New-SoundLiftBrush $palette.Control; $element.Foreground = New-SoundLiftBrush $palette.Primary
         $element.BorderBrush = New-SoundLiftBrush $palette.Border; $element.BorderThickness = [Windows.Thickness]::new(1)
+    } elseif ($element -is [Windows.Controls.ComboBoxItem] -or $element -is [Windows.Controls.ListBoxItem]) {
+        $element.Background = New-SoundLiftBrush $palette.Control; $element.Foreground = New-SoundLiftBrush $palette.Primary
     } elseif ($element -is [Windows.Controls.CheckBox] -or $element -is [Windows.Controls.RadioButton]) {
         $element.Foreground = New-SoundLiftBrush $palette.Secondary
     } elseif ($element -is [Windows.Controls.Border]) {
@@ -816,7 +818,7 @@ if (-not (Confirm-DiscordAccountLink)) {
 
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SoundLift V2.0.4" Width="1280" Height="800" MinWidth="1024" MinHeight="700"
+        Title="SoundLift V2.0.5" Width="1280" Height="800" MinWidth="1024" MinHeight="700"
         WindowStartupLocation="CenterScreen" Background="#070707" Foreground="{DynamicResource PrimaryTextBrush}"
         FontFamily="Segoe UI" ResizeMode="CanResizeWithGrip" ShowInTaskbar="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -1073,7 +1075,7 @@ $xaml = @'
               <TextBlock Name="LicenseStatusText" Text="Licenc: ingyenes" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,3,0,0"/>
             </StackPanel>
           </Border>
-          <TextBlock Name="VersionText" Text="Telepített verzió: 2.0.4" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="4,0,0,3"/>
+          <TextBlock Name="VersionText" Text="Telepített verzió: 2.0.5" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="4,0,0,3"/>
           <TextBlock Name="SupportIdText" Text="Támogatási ID: betöltés…" FontSize="9" Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis" Margin="4,0,0,4"/>
           <Button Name="CopySupportIdButton" Content="⧉  ID másolása" Style="{StaticResource UtilityButton}" Margin="0"/>
         </StackPanel>
@@ -1260,7 +1262,7 @@ if (Test-Path $appIconPath) {
 $script:reallyExit = $false
 $script:trayIcon = New-Object Windows.Forms.NotifyIcon
 $script:trayIcon.Icon = if (Test-Path $appIconPath) { New-Object Drawing.Icon($appIconPath) } else { [Drawing.SystemIcons]::Application }
-$script:trayIcon.Text = 'SoundLift V2.0.4'
+$script:trayIcon.Text = 'SoundLift V2.0.5'
 $script:trayIcon.Visible = $true
 $names = @('StatusBorder','StatusText','DeviceText','ProfilePanel','ProfileOrderButton','VolumeValue','BassValue','FrequencyValue','VolumeSlider','BassSlider','FrequencySlider','SafetyCheck','MusicButton','GameButton','CombatButton','R6Button','DiscordButton','MovieButton','HeavyButton','ResetButton','CustomFeaturesTitle','ExtraBassProButton','VoiceBoostButton','CustomPresetXButton','ApplyButton','EqPanel','AutoProfileCheck','InstantCheck','StartupCheck','DoNotDisturbCheck','NightModeCheck','OverlayCheck','DiscordPresenceCheck','ClipText','LeftPeakMeter','RightPeakMeter','LeftPeakText','RightPeakText','LiveBoostText','LiveClipText','ProfileManagerButton','SaveButton','LoadButton','ExportButton','ImportButton','UndoButton','BypassButton','TestButton','DeviceButton','AppVolumeButton','MicrophoneButton','DiagnosticsButton','RepairApoButton','ReportProblemButton','UpdateButton','RollbackButton','OwnerModeButton','ChangelogButton','HotkeyButton','StatisticsButton','DeveloperConsoleButton','AboutButton','PrivacyButton','ActiveProfileText','ThemeCombo','VersionText','SupportIdText','CopySupportIdButton','LicenseStatusText','LicenseButton')
 foreach ($name in $names) { Set-Variable -Name $name -Value $window.FindName($name) }
@@ -1983,7 +1985,7 @@ function Show-ProblemReportWindow {
             $StatusBorder.Background = if ($sent) { $window.Resources['SurfaceAltBrush'] } else { $window.Resources['HoverBrush'] }
             $dialog.Close()
             $resultText = if ($sent) { 'A jelentést sikeresen elküldtük.' } else { 'A jelentést biztonságosan elmentettük, és a következő indításkor automatikusan újraküldjük.' }
-            Show-SoundLiftMessage "$resultText`nTámogatási ID: $(Get-SoundLiftSupportId)" 'SoundLift – Hiba jelentése' 'OK' 'Information' $dialog | Out-Null
+            Show-SoundLiftMessage "$resultText`nTámogatási ID: $(Get-SoundLiftSupportId)" 'SoundLift – Hiba jelentése' 'OK' 'Information' $window | Out-Null
         } catch {
             $send.IsEnabled=$true; $send.Content='Újrapróbálás'
             Show-SoundLiftMessage "A jelentés elküldése nem sikerült:`n$($_.Exception.Message)" 'SoundLift – Hiba jelentése' 'OK' 'Error' $dialog | Out-Null
@@ -2286,7 +2288,10 @@ try {
 function Show-AppUpdateDialog([object]$release, [version]$latestVersion) {
     $dialog=[Windows.Window]::new(); $dialog.Title='SoundLift – Frissítés'; $dialog.Width=550; $dialog.Height=345
     $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; Set-SoundLiftWindowStyle $dialog
-    $mandatory = $latestVersion -ge [version]'2.0.4' -and [version]$script:appVersion -lt [version]'2.0.4'
+    $requiredVersion = $null
+    $requiredMatch = [regex]::Match([string]$release.body, '(?im)^SOUNDLIFT_REQUIRED_VERSION\s*=\s*([0-9]+(?:\.[0-9]+){1,3})\s*$')
+    if($requiredMatch.Success){try{$requiredVersion=[version]$requiredMatch.Groups[1].Value}catch{}}
+    $mandatory = $requiredVersion -and ([version]$script:appVersion -lt $requiredVersion) -and ($latestVersion -ge $requiredVersion)
     $dialog.Tag = [PSCustomObject]@{ Mandatory=$mandatory; AllowClose=$false }
     $panel=[Windows.Controls.StackPanel]::new(); $panel.Margin=[Windows.Thickness]::new(28)
     $title=[Windows.Controls.TextBlock]::new(); $title.Text='Új SoundLift-frissítés érhető el'; $title.FontSize=23; $title.FontWeight='Bold'; $title.Foreground='#FF4057'
@@ -2470,11 +2475,18 @@ $PrivacyButton.Add_Click({ Show-PrivacyWindow })
 
 function Show-ChangelogWindow {
     $changelog = @"
+V2.0.5 – KÖTELEZŐ FRISSÍTÉSEK ÉS TELJES TÉMAJAVÍTÁS
+• A kötelező verziót a hivatalos GitHub-kiadás jelöli, ezért a későbbi kötelező frissítéseknél nincs Később gomb.
+• A kötelező frissítési ablak bezárása és átugrása le van tiltva a telepítés befejezéséig.
+• Minden saját felugró ablak egységes témapalettát, kontrasztos szöveget és témához illő listaelemeket használ.
+• A hosszabb feliratok automatikusan több sorba törnek, így nem lógnak ki és nem olvadnak a háttérbe.
+• A hibajelentés sikerablaka most mindig érvényes főablakhoz kapcsolódik.
+
 V2.0.4 – TELJES BEÁLLÍTÁSSÁV
 • Ismét látható az összes főképernyős kapcsoló, több sorba törő elrendezéssel.
 • Visszakerült az automatikus profilváltás, az éjszakai mód, a profilváltási jelzés és a Discord-állapot.
 • A kapcsolók állapota bezárás után is megmarad, a hozzájuk tartozó funkciók pedig valóban elindulnak.
-• A V2.0.4 kötelező frissítés, mert a hiányzó beállításokat és az automatikus telepítést is javítja.
+• Az automatikus frissítő stabilabban adja át a telepítést a külön frissítési segédnek.
 
 V2.0.3 – LETISZTULT GÖRGETÉS ÉS PROFILMENÜ
 • A világos Windows-görgetősávok minden SoundLift-ablakból eltűntek.

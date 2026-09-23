@@ -1,5 +1,5 @@
 name: Build Windows application
-run-name: SoundLift V2.0.4 letöltése
+run-name: SoundLift V2.0.5 letöltése
 
 on:
   workflow_dispatch:
@@ -62,7 +62,7 @@ jobs:
       - name: Upload Windows files
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: SoundLift V2.0.4 letöltése
+          name: SoundLift V2.0.5 letöltése
           path: |
             dist/SoundLift.exe
             dist/SoundLift.Setup.exe
@@ -86,7 +86,7 @@ jobs:
             '--title', "SoundLift $tag",
             '--target', '${{ github.sha }}',
             '--latest',
-            '--generate-notes'
+            '--notes', "SOUNDLIFT_REQUIRED_VERSION=2.0.5`n`nKötelező stabilitási és felületi frissítés."
           )
           $oldErrorActionPreference = $ErrorActionPreference
           $ErrorActionPreference = 'SilentlyContinue'

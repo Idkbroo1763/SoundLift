@@ -36,8 +36,8 @@ foreach ($requiredUniversalBuildFragment in @(
  if (-not $buildSource.Contains($requiredUniversalBuildFragment)) { throw "Missing universal build behavior: $requiredUniversalBuildFragment" }
 }
 if (-not $buildSource.Contains('RELEASE_CONFIGURATION_EMBEDDING_VERIFIED')) { throw 'Missing release configuration verification' }
-if (-not $source.Contains("`$script:appVersion = '2.0.4'")) { throw 'Application version was not updated to 2.0.4' }
-foreach ($requiredV2DashboardFragment in @('SoundLift V2.0.4', 'GYORS PROFILOK', 'QuickProfileButton', 'DashboardCard', 'SOUNDLIFT PRO', 'ProfileManagerButton', 'PART_Popup', 'AccentContrastBrush', '<UniformGrid Columns="3">', 'ThemedContextMenu', 'ThemedMenuItem', "`$activeButton.Background = `$window.Resources['AccentGradient']")) {
+if (-not $source.Contains("`$script:appVersion = '2.0.5'")) { throw 'Application version was not updated to 2.0.5' }
+foreach ($requiredV2DashboardFragment in @('SoundLift V2.0.5', 'GYORS PROFILOK', 'QuickProfileButton', 'DashboardCard', 'SOUNDLIFT PRO', 'ProfileManagerButton', 'PART_Popup', 'AccentContrastBrush', '<UniformGrid Columns="3">', 'ThemedContextMenu', 'ThemedMenuItem', "`$activeButton.Background = `$window.Resources['AccentGradient']")) {
  if (-not $source.Contains($requiredV2DashboardFragment)) { throw "Missing V2.0 dashboard behavior: $requiredV2DashboardFragment" }
 }
 foreach ($requiredFeature in @('Invoke-SoundLiftDownload','Repair-SoundLiftApoInclude','Show-ProblemReportWindow','Show-PostUpdateResult','Show-PrivacyWindow','Disable-SoundLiftEffects')) {
@@ -150,8 +150,8 @@ foreach($requiredUpdaterFix in @("`$deadline = [DateTime]::UtcNow.AddSeconds(12)
 foreach($restoredOption in @('Name="AutoProfileCheck" Content=','Name="NightModeCheck" Content=','Name="OverlayCheck" Content=','Name="DiscordPresenceCheck" Content=','$autoTimer.Start()','$presenceTimer.Start()')) {
     if(-not $source.Contains($restoredOption)){throw "Missing restored option: $restoredOption"}
 }
-foreach($mandatoryUpdateMarker in @("`$mandatory = `$latestVersion -ge [version]'2.0.4'","`$later.Visibility='Collapsed'",'if($dialog.Tag.Mandatory -and -not $dialog.Tag.AllowClose)')) {
-    if(-not $source.Contains($mandatoryUpdateMarker)){throw "Missing mandatory V2.0.4 update behavior: $mandatoryUpdateMarker"}
+foreach($mandatoryUpdateMarker in @('SOUNDLIFT_REQUIRED_VERSION','[string]$release.body',"`$later.Visibility='Collapsed'",'if($dialog.Tag.Mandatory -and -not $dialog.Tag.AllowClose)')) {
+    if(-not $source.Contains($mandatoryUpdateMarker)){throw "Missing mandatory update behavior: $mandatoryUpdateMarker"}
 }
 if ($source.Contains('Check-AppUpdate -Silent')) { throw 'Blocking startup update check is still enabled' }
 
@@ -263,7 +263,7 @@ try {
  if (Test-Path (Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe')) { throw 'Free user received a rollback executable' }
  $script:currentLicenseType='developer'
  Save-SoundLiftRollbackCopy
- $script:appVersion='2.0.4'
+ $script:appVersion='2.0.5'
  if (-not (Get-SoundLiftRollbackState)) { throw 'Valid rollback copy was rejected' }
  [IO.File]::AppendAllText((Join-Path $script:appDirectory 'rollback\SoundLift.previous.exe'), 'tampered')
  if (Get-SoundLiftRollbackState) { throw 'Tampered rollback copy was accepted' }
