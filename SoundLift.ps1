@@ -2286,22 +2286,27 @@ try {
 function Show-AppUpdateDialog([object]$release, [version]$latestVersion) {
     $dialog=[Windows.Window]::new(); $dialog.Title='SoundLift – Frissítés'; $dialog.Width=550; $dialog.Height=345
     $dialog.ResizeMode='NoResize'; $dialog.WindowStartupLocation='CenterOwner'; $dialog.Owner=$window; Set-SoundLiftWindowStyle $dialog
+    $mandatory = $latestVersion -ge [version]'2.0.4' -and [version]$script:appVersion -lt [version]'2.0.4'
+    $dialog.Tag = [PSCustomObject]@{ Mandatory=$mandatory; AllowClose=$false }
     $panel=[Windows.Controls.StackPanel]::new(); $panel.Margin=[Windows.Thickness]::new(28)
     $title=[Windows.Controls.TextBlock]::new(); $title.Text='Új SoundLift-frissítés érhető el'; $title.FontSize=23; $title.FontWeight='Bold'; $title.Foreground='#FF4057'
     $details=[Windows.Controls.TextBlock]::new(); $details.Text="Telepített verzió: $script:appVersion`nÚj verzió: $latestVersion"; $details.FontSize=14; $details.Margin=[Windows.Thickness]::new(0,16,0,14)
-    $status=[Windows.Controls.TextBlock]::new(); $status.Text='A frissítés automatikusan letöltődik és települ.'; $status.TextWrapping='Wrap'; $status.Foreground='#CBD5E1'; $status.Margin=[Windows.Thickness]::new(0,0,0,18)
+    $status=[Windows.Controls.TextBlock]::new(); $status.Text=if($mandatory){'Ez egy kötelező frissítés. A SoundLift használatához telepítened kell.'}else{'A frissítés automatikusan letöltődik és települ.'}; $status.TextWrapping='Wrap'; $status.Foreground='#CBD5E1'; $status.Margin=[Windows.Thickness]::new(0,0,0,18)
     $progress=[Windows.Controls.ProgressBar]::new(); $progress.Height=9; $progress.Minimum=0; $progress.Maximum=100; $progress.Value=0; $progress.Visibility='Collapsed'; $progress.Margin=[Windows.Thickness]::new(0,0,0,20); $progress.Foreground=$window.Resources['AccentTextBrush']; $progress.Background='#242429'
     $buttons=[Windows.Controls.StackPanel]::new(); $buttons.Orientation='Horizontal'; $buttons.HorizontalAlignment='Right'
     $later=[Windows.Controls.Button]::new(); $later.Content='Később'; $later.Width=100; $later.Margin=[Windows.Thickness]::new(0,0,10,0)
+    if($mandatory){$later.Visibility='Collapsed'}
     $install=[Windows.Controls.Button]::new(); $install.Content='Frissítés telepítése'; $install.Width=175
     $later.Add_Click({ $dialog.Close() }.GetNewClosure())
     $install.Add_Click({
         if (Install-SoundLiftUpdate $release $latestVersion $status $install $progress) {
+            $dialog.Tag.AllowClose=$true
             $dialog.Close(); $script:reallyExit=$true
             if ($script:trayIcon) { $script:trayIcon.Visible=$false; $script:trayIcon.Dispose() }
             $window.Close()
         }
     }.GetNewClosure())
+    $dialog.Add_Closing({param($sender,$eventArgs);if($dialog.Tag.Mandatory -and -not $dialog.Tag.AllowClose){$eventArgs.Cancel=$true}}.GetNewClosure())
     $buttons.Children.Add($later)|Out-Null; $buttons.Children.Add($install)|Out-Null
     foreach($control in @($title,$details,$status,$progress,$buttons)){ $panel.Children.Add($control)|Out-Null }
     $dialog.Content=$panel; $dialog.ShowDialog()|Out-Null
@@ -2469,6 +2474,7 @@ V2.0.4 – TELJES BEÁLLÍTÁSSÁV
 • Ismét látható az összes főképernyős kapcsoló, több sorba törő elrendezéssel.
 • Visszakerült az automatikus profilváltás, az éjszakai mód, a profilváltási jelzés és a Discord-állapot.
 • A kapcsolók állapota bezárás után is megmarad, a hozzájuk tartozó funkciók pedig valóban elindulnak.
+• A V2.0.4 kötelező frissítés, mert a hiányzó beállításokat és az automatikus telepítést is javítja.
 
 V2.0.3 – LETISZTULT GÖRGETÉS ÉS PROFILMENÜ
 • A világos Windows-görgetősávok minden SoundLift-ablakból eltűntek.

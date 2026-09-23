@@ -147,8 +147,11 @@ if(([regex]::Matches($source,[regex]::Escape('$script:trayIcon.Dispose()'))).Cou
 foreach($requiredUpdaterFix in @("`$deadline = [DateTime]::UtcNow.AddSeconds(12)",'Stop-Process -Id `$soundLiftProcessId -Force',"`$updateLogPath = Join-Path `$appDataDirectory 'update-installer.log'","`$script:trayIcon.Visible=`$false")) {
     if(-not $source.Contains($requiredUpdaterFix)){throw "Missing automatic updater shutdown fix: $requiredUpdaterFix"}
 }
-foreach($restoredOption in @('Content="Automatikus profilváltás"','Content="Éjszakai mód"','Content="Profilváltási jelzés"','Content="Discord-állapot"','$autoTimer.Start()','$presenceTimer.Start()')) {
+foreach($restoredOption in @('Name="AutoProfileCheck" Content=','Name="NightModeCheck" Content=','Name="OverlayCheck" Content=','Name="DiscordPresenceCheck" Content=','$autoTimer.Start()','$presenceTimer.Start()')) {
     if(-not $source.Contains($restoredOption)){throw "Missing restored option: $restoredOption"}
+}
+foreach($mandatoryUpdateMarker in @("`$mandatory = `$latestVersion -ge [version]'2.0.4'","`$later.Visibility='Collapsed'",'if($dialog.Tag.Mandatory -and -not $dialog.Tag.AllowClose)')) {
+    if(-not $source.Contains($mandatoryUpdateMarker)){throw "Missing mandatory V2.0.4 update behavior: $mandatoryUpdateMarker"}
 }
 if ($source.Contains('Check-AppUpdate -Silent')) { throw 'Blocking startup update check is still enabled' }
 
